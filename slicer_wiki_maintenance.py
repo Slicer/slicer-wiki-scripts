@@ -5,6 +5,7 @@ import ConfigParser
 import fnmatch
 import glob
 import git
+import itertools
 import json
 import os
 import platform
@@ -266,7 +267,7 @@ def saveWikiPage(wikiName, name, summary, content):
     return page.save(content, summary=summary)
 
 #---------------------------------------------------------------------------
-def getCategoriesWithSubCategories(itemCategories):
+def getCategoryItems(itemCategories):
 
     #----------------------------------------------------------------------
     def _getParentCategory(category):
@@ -332,7 +333,14 @@ def parseContributors(name, contributors):
     #     [1] https://github.com/Slicer/Slicer/blob/a8a01aa29210f938eaf48bb5c991681c3c67632d/Modules/Scripted/ExtensionWizard/ExtensionWizardLib/EditExtensionMetadataDialog.py#L101
 
     def _parseIndividuals(individuals):
-        return individuals.split(",")
+        # Clean inputs
+        individuals = individuals.replace("This tool was developed by", "")
+        # Split by ',' and 'and', then flatten the list using itertools
+        individuals=list(itertools.chain.from_iterable(
+            [individual.split("and") for individual in individuals.split(",")]))
+        # Strip spaces and dot from each individuals and remove empty ones
+        individuals = filter(None, [individual.strip().strip(".") for individual in individuals])
+        return individuals
 
     def _parseOrganization(organization):
         try:
@@ -395,29 +403,29 @@ def getModuleContributors(modulesMetadata):
     return {name: modulesMetadata[name]['contributors'] for name in modulesMetadata}
 
 #---------------------------------------------------------------------------
-def getContributingOrganizationsAndIndividuals(contributorsByItem):
+def getContributingOrganizationsAndIndividuals(itemContributors):
 
-    organizations = {}
-    individuals = {}
-    itemToOrganizations = {}
-    individualToOrganizations = {}
-    for name, contributors in contributorsByItem.iteritems():
+    organizationItems = {}
+    individualItems = {}
+    itemOrganizations = {}
+    individualOrganizations = {}
+    for itemName, contributors in itemContributors.iteritems():
 
-        (orgToIndividuals, individualToOrgs) = parseContributors(name, contributors)
+        (orgToIndividuals, individualToOrgs) = parseContributors(itemName, contributors)
 
         for organization in orgToIndividuals.keys():
-            _appendToDictValue(organizations, organization, name)
+            _appendToDictValue(organizationItems, organization, itemName)
 
-            itemToOrganizations[name] = orgToIndividuals
+            itemOrganizations[itemName] = orgToIndividuals
 
         for individual in individualToOrgs.keys():
-            _appendToDictValue(individuals, individual, name)
+            _appendToDictValue(individualItems, individual, itemName)
             orgs = individualToOrgs[individual]
             for org in orgs:
                 if org:
-                    _appendToDictValue(individualToOrganizations, individual, org, allowDuplicate=False)
+                    _appendToDictValue(individualOrganizations, individual, org, allowDuplicate=False)
 
-    return (organizations, individuals, itemToOrganizations, individualToOrganizations)
+    return (organizationItems, individualItems, itemOrganizations, individualOrganizations)
 
 #---------------------------------------------------------------------------
 def sortKeys(dict_, prettifyKey=False):
@@ -444,16 +452,19 @@ def generateContributorsWikiLinks(extensionName, organizations):
             individualLink = "[[#{}|{}]]".format(individual, individual)
 
 #---------------------------------------------------------------------------
-def tocEntryAsWikiListItem(name, level=0):
-    extras = []
-
-    individualToOrganizations = cacheEntry("individualToOrganizations")
-
-    return linkAsWikiListItem(wikiPageToWikiLink(convertTitleToWikiAnchor(name), prettify(name)), level, extras)
+def tocEntryAsWikiListItem(name, level=0, extras=[]):
+    return linkAsWikiListItem(
+        wikiPageToWikiLink(convertTitleToWikiAnchor(name), prettify(name)),
+        level, extras)
 
 #---------------------------------------------------------------------------
 def individualEntryAsWikiListItem(name, level=0):
-    return tocEntryAsWikiListItem(name, level)
+    extras = []
+    individualOrganizations = cacheEntry("individualOrganizations")
+    if name in individualOrganizations:
+        if individualOrganizations[name]:
+            extras.append(individualOrganizations[name][0])
+    return tocEntryAsWikiListItem(name, level, extras)
 
 #---------------------------------------------------------------------------
 def headerForWikiList(title, teaser):
@@ -478,12 +489,13 @@ def footerForWikiList(title, teaser):
 def moduleLinkAsListItem(link, level=0):
     name = link['name']
     extras = []
-    modules = cacheEntry("modules")
-    if name in modules:
-        extensionName = modules[name]['extensionName']
+    moduleTypes = cacheEntry("moduleTypes")
+    moduleExtensions = cacheEntry("moduleExtensions")
+    if name in moduleExtensions:
+        extensionName = moduleExtensions[name]
         extensionLinks = cacheEntry("extensionLinks")
         # type (cli, loadable, scripted)
-        extras.append(modules[name]['moduleType'])
+        extras.append(moduleTypes[name])
         # provenance (built-in or extension)
         if extensionName in extensionLinks:
             extras.append("bundled in {} extension".format(extensionLinks[extensionName]['wikilink']))
@@ -666,21 +678,27 @@ def getModulesMetadata(wikiName):
     modulesMetadata = mergeMetadataFiles('slicer-modules-metadata')
 
     # Collect wiki links
-    links = \
-        generateItemWikiLinks('Modules', wikiName, {name:"" for name in modulesMetadata.keys()})
+    moduleLinks = \
+        generateItemWikiLinks('Modules', wikiName,
+            {name:"" for name in modulesMetadata.keys()})
 
     # Collect categories
     print("\nCollecting module 'categories with sub-categories'")
-    categories = getModuleCategories(modulesMetadata)
-    categoriesWithSub = getCategoriesWithSubCategories(categories)
+    moduleCategories = getModuleCategories(modulesMetadata)
+    categoryModules = getCategoryItems(moduleCategories)
 
     # Collect contributing organizations and individuals
-    contributors = getModuleContributors(modulesMetadata)
+    moduleContributors = getModuleContributors(modulesMetadata)
     print("\nCollecting module 'contributing organizations and individuals'")
-    (organizations, individuals, modulesToOrganizations, individualToOrganizations) = \
-            getContributingOrganizationsAndIndividuals(contributors)
+    (organizationModules, individualModules,
+     moduleOrganizations, individualOrganizations) = \
+            getContributingOrganizationsAndIndividuals(moduleContributors)
 
-    return (links, categories, categoriesWithSub, organizations, individuals, individualToOrganizations)
+    return (moduleLinks,
+            moduleCategories,
+            categoryModules,
+            organizationModules,
+            individualModules, individualOrganizations)
 
 #---------------------------------------------------------------------------
 def getExtensionsMetadata(slicerVersion, wikiName):
@@ -699,20 +717,25 @@ def getExtensionsMetadata(slicerVersion, wikiName):
     files = getDescriptionFiles(getExtensionsIndexTopLevelDirectory(), SLICER_EXTENSIONS_SKIP)
 
     # Collect wiki links
-    links = generateItemWikiLinks('Extensions', wikiName, getExtensionHomepages(files))
+    extensionLinks = \
+        generateItemWikiLinks('Extensions', wikiName, getExtensionHomepages(files))
 
     # Collect categories
     print("\nCollecting module 'categories with sub-categories'")
-    categories = getExtensionCategories(files)
-    categoriesWithSub = getCategoriesWithSubCategories(categories)
+    extensionCategories = getExtensionCategories(files)
+    categoryExtensions = getCategoryItems(extensionCategories)
 
     # Collect contributing organizations and individuals
-    contributors = getExtensionContributors(files)
+    extensionContributors = getExtensionContributors(files)
     print("\nCollecting extension 'contributing organizations and individuals'")
-    (organizations, individuals, extensionsToOrganizations, individualToOrganizations) = \
-            getContributingOrganizationsAndIndividuals(contributors)
+    (organizationExtensions, individualExtensions,
+     extensionOrganizations, individualOrganizations) = \
+            getContributingOrganizationsAndIndividuals(extensionContributors)
 
-    return (links, categories, categoriesWithSub, organizations, individuals, individualToOrganizations)
+    return (extensionLinks,
+            extensionCategories, categoryExtensions,
+            organizationExtensions,
+            individualExtensions, individualOrganizations)
 
 #---------------------------------------------------------------------------
 def getExtensionLauncherAdditionalSettingsFromBuildDirs(slicerExtensionIndexBuildDir):
@@ -1056,15 +1079,33 @@ def getExtensionModules():
     return mergeMetadataFiles('slicer-extension-modules')
 
 #---------------------------------------------------------------------------
-def getModules(extensionModules):
-    modules = {}
+def getModuleTypes(extensionModules):
+    moduleTypes = {}
+    for extensionName, extensionModuleTypes in extensionModules.iteritems():
+        for moduleType, moduleNames in extensionModuleTypes.iteritems():
+            for moduleName in moduleNames:
+                moduleTypes[moduleName] = moduleType
+    return moduleTypes
+
+#---------------------------------------------------------------------------
+def getModuleExtensions(extensionModules):
+    moduleExtensions = {}
     for extensionName, moduleTypes in extensionModules.iteritems():
         for moduleType, moduleNames in moduleTypes.iteritems():
             for moduleName in moduleNames:
-                #print([moduleName, extensionName, moduleType])
-                modules[moduleName] = { 'extensionName' : extensionName,
-                                        'moduleType' : moduleType }
-    return modules
+                moduleExtensions[moduleName] = extensionName
+    return moduleExtensions
+
+#---------------------------------------------------------------------------
+# def getModules(extensionModules):
+#     modules = {}
+#     for extensionName, moduleTypes in extensionModules.iteritems():
+#         for moduleType, moduleNames in moduleTypes.iteritems():
+#             for moduleName in moduleNames:
+#                 #print([moduleName, extensionName, moduleType])
+#                 modules[moduleName] = { 'extensionName' : extensionName,
+#                                         'moduleType' : moduleType }
+#     return modules
 
 #---------------------------------------------------------------------------
 def saveAllExtensionsModulesMetadata(slicerBuildDir, slicerExtensionIndexBuildDir,
@@ -1150,34 +1191,36 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
         slicerVersion = getSlicerVersion(slicerBuildDir)
 
     # Extension metadata
-    (extensionLinks, extensionCategories, extensionCategoriesWithSub, extensionOrganizations, extensionIndividuals, individualToOrganizationsForExtensions) = \
+    (extensionLinks, extensionCategories, categoryExtensions,
+     extensionOrganizations, extensionIndividuals, individualOrganizationsForExtensions) = \
             getExtensionsMetadata(slicerVersion, wikiName)
 
     # Module metadata
-    (moduleLinks, moduleCategories, moduleCategoriesWithSub, moduleOrganizations, moduleIndividuals, individualToOrganizationsForModules) = \
+    (moduleLinks, moduleCategories, categoryModules,
+     moduleOrganizations, moduleIndividuals, individualOrganizationsForModules) = \
             getModulesMetadata(wikiName)
 
-    # Individual to organization metadata
-    individualToOrganizations = _merge(dict(individualToOrganizationsForExtensions), individualToOrganizationsForModules)
+    moduleExtensions = getModuleExtensions(getExtensionModules())
+    moduleTypes = getModuleTypes(getExtensionModules())
 
-    # Extension to module metadata
-    modules = getModules(getExtensionModules())
+    # Individual metadata
+    individualOrganizations = _merge(dict(individualOrganizationsForExtensions), individualOrganizationsForModules)
 
     # Module by types
-    moduleTypes = {}
-    for name in modules:
-        moduleType = modules[name]['moduleType']
-        if moduleType not in moduleTypes:
-            moduleTypes[moduleType] = []
+    typeModules = {}
+    for name in moduleTypes:
+        moduleType = moduleTypes[name]
+        if moduleType not in typeModules:
+            typeModules[moduleType] = []
         if name in moduleLinks:
-            moduleTypes[moduleType].append(name)
+            typeModules[moduleType].append(name)
 
     withSectionToc = True
 
     #-----------------------------------------------------------------------
     def _updateModuleLink(name, moduleLink):
-        if name in modules:
-            extensionName = modules[name]['extensionName']
+        if name in moduleExtensions:
+            extensionName = moduleExtensions[name]
             if extensionName in extensionLinks:
                 extensionItem = extensionLinks[extensionName]
                 if moduleLinks[name]['type'] == WIKI_LINK_OFF:
@@ -1209,9 +1252,10 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
         {k:v for (k,v) in moduleLinks.iteritems() if not _excludeModule(k)}
 
     # Cache dictionnaries so that they can be re-used from the link renderer
-    setCacheEntry("modules", modules)
     setCacheEntry("extensionLinks", extensionLinks)
-    setCacheEntry("individualToOrganizations", individualToOrganizations)
+    setCacheEntry("moduleExtensions", moduleExtensions)
+    setCacheEntry("moduleTypes", moduleTypes)
+    setCacheEntry("individualOrganizations", individualOrganizations)
 
     moduleLinksRenderer = (headerForWikiList, moduleLinkAsListItem, headerForWikiList)
 
@@ -1223,7 +1267,7 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
                     linksRenderer=moduleLinksRenderer))
 
     sections.append(itemByCategoryToWiki('Modules', moduleLinks,
-                    moduleCategoriesWithSub,
+                    categoryModules,
                     linksRenderer=moduleLinksRenderer,
                     withToc=withSectionToc))
 
@@ -1239,14 +1283,14 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
                     withToc=withSectionToc))
 
     sections.append(itemByPropertyToWiki('Modules', moduleLinks,
-                    "type", moduleTypes,
+                    "type", typeModules,
                     linksRenderer=moduleLinksRenderer,
                     withToc=withSectionToc))
 
     sections.append(itemByNameToWiki('Extensions', extensionLinks))
 
     sections.append(itemByCategoryToWiki('Extensions', extensionLinks,
-                    extensionCategoriesWithSub,
+                    categoryExtensions,
                     withToc=withSectionToc))
 
     sections.append(itemByPropertyToWiki('Extensions', extensionLinks,
