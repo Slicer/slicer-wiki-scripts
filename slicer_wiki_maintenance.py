@@ -1317,27 +1317,32 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
                     linksRenderer=moduleLinksRenderer,
                     withToc=withSectionToc))
 
+    sections.append(("<br>Available extensions:" ,None, None))
+
     sections.append(itemByPropertyToWiki('Modules', moduleLinks,
-                    "available extension", extensionModules,
+                    "extension", extensionModules,
                     linksRenderer=moduleLinksRenderer,
                     withToc=withSectionToc))
 
     # Working extensions
-    sections.append(itemByNameToWiki('Available extensions', availableExtensionLinks))
+    sections.append(itemByNameToWiki('Extensions', availableExtensionLinks))
 
-    sections.append(itemByCategoryToWiki('Available extensions', extensionLinks,
+    sections.append(itemByCategoryToWiki('Extensions', extensionLinks,
                     categoryAvailableExtensions,
                     withToc=withSectionToc))
 
-    sections.append(itemByPropertyToWiki('Available extensions', extensionLinks,
+    sections.append(itemByPropertyToWiki('Extensions', extensionLinks,
                     "contributing organization", organizationAvailableExtensions,
                     withToc=withSectionToc))
 
-    sections.append(itemByPropertyToWiki('Available extensions', extensionLinks,
+    sections.append(itemByPropertyToWiki('Extensions', extensionLinks,
                     "contributing individual", individualAvailableExtensions,
+                    tocEntryRenderer=individualEntryAsWikiListItem,
                     withToc=withSectionToc))
 
     # Broken extensions
+    sections.append(("<br>Broken extensions:" ,None, None))
+
     sections.append(itemByNameToWiki('Broken extensions', brokenExtensionLinks))
 
     sections.append(itemByCategoryToWiki('Broken extensions', extensionLinks,
@@ -1350,6 +1355,7 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
 
     sections.append(itemByPropertyToWiki('Broken extensions', extensionLinks,
                     "contributing individual", individualBrokenExtensions,
+                    tocEntryRenderer=individualEntryAsWikiListItem,
                     withToc=withSectionToc))
 
 
@@ -1357,10 +1363,14 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
     if withSectionToc:
         lines.append('__NOTOC__')
         for (title, anchor, content) in sections:
-            lines.append("* [[{0}|{1}]]".format(anchor, title))
+            if content:
+                lines.append("* [[{0}|{1}]]".format(anchor, title))
+            else:
+                lines.append(title)
 
     for (title, anchor, content) in sections:
-        lines.extend(content)
+        if content:
+            lines.extend(content)
 
     if updateWiki:
         result = saveWikiPage(wikiName, 'User:UpdateBot/Issue-2843-Consolidated-Extension-List', \
