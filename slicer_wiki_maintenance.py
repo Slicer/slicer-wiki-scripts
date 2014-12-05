@@ -1215,6 +1215,15 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
         if name in moduleLinks:
             typeModules[moduleType].append(name)
 
+    # Module by extensions
+    extensionModules = {}
+    for name in moduleExtensions:
+        moduleExtension = moduleExtensions[name]
+        if moduleExtension not in extensionModules:
+            extensionModules[moduleExtension] = []
+        if name in moduleLinks:
+            extensionModules[moduleExtension].append(name)
+
     withSectionToc = True
 
     #-----------------------------------------------------------------------
@@ -1284,6 +1293,11 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
 
     sections.append(itemByPropertyToWiki('Modules', moduleLinks,
                     "type", typeModules,
+                    linksRenderer=moduleLinksRenderer,
+                    withToc=withSectionToc))
+
+    sections.append(itemByPropertyToWiki('Modules', moduleLinks,
+                    "extension", extensionModules,
                     linksRenderer=moduleLinksRenderer,
                     withToc=withSectionToc))
 
