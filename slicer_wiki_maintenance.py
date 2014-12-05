@@ -671,71 +671,11 @@ def getExtensionsIndexTopLevelDirectory():
     return os.path.join(tempfile.gettempdir(), 'slicer-extensions-index')
 
 #---------------------------------------------------------------------------
-def getModulesMetadata(wikiName):
-    # Clone repository hosting package metadata
-    cloneRepository(SLICER_PACKAGES_METADATA_GIT_URL, getPackagesMetadataTopLevelDirectory())
-
-    modulesMetadata = mergeMetadataFiles('slicer-modules-metadata')
-
-    # Collect wiki links
+def getModuleLinks(wikiName, modulesMetadata):
     moduleLinks = \
         generateItemWikiLinks('Modules', wikiName,
             {name:"" for name in modulesMetadata.keys()})
-
-    # Collect categories
-    print("\nCollecting module 'categories with sub-categories'")
-    moduleCategories = getModuleCategories(modulesMetadata)
-    categoryModules = getCategoryItems(moduleCategories)
-
-    # Collect contributing organizations and individuals
-    moduleContributors = getModuleContributors(modulesMetadata)
-    print("\nCollecting module 'contributing organizations and individuals'")
-    (organizationModules, individualModules,
-     moduleOrganizations, individualOrganizations) = \
-            getContributingOrganizationsAndIndividuals(moduleContributors)
-
-    return (moduleLinks,
-            moduleCategories,
-            categoryModules,
-            organizationModules,
-            individualModules, individualOrganizations)
-
-#---------------------------------------------------------------------------
-def getExtensionsMetadata(slicerVersion, wikiName):
-
-    SLICER_EXTENSIONS_SKIP = ['boost', 'Eigen']
-
-    # Clone extensions index
-    repo = cloneRepository(SLICER_EXTENSIONS_INDEX_GIT_URL, getExtensionsIndexTopLevelDirectory())
-    if slicerVersion not in repo.heads:
-        repo.git.checkout('origin/{0}'.format(slicerVersion), b=slicerVersion)
-
-    # Get latest change
-    repo.git.pull()
-
-    # Collect description files
-    files = getDescriptionFiles(getExtensionsIndexTopLevelDirectory(), SLICER_EXTENSIONS_SKIP)
-
-    # Collect wiki links
-    extensionLinks = \
-        generateItemWikiLinks('Extensions', wikiName, getExtensionHomepages(files))
-
-    # Collect categories
-    print("\nCollecting module 'categories with sub-categories'")
-    extensionCategories = getExtensionCategories(files)
-    categoryExtensions = getCategoryItems(extensionCategories)
-
-    # Collect contributing organizations and individuals
-    extensionContributors = getExtensionContributors(files)
-    print("\nCollecting extension 'contributing organizations and individuals'")
-    (organizationExtensions, individualExtensions,
-     extensionOrganizations, individualOrganizations) = \
-            getContributingOrganizationsAndIndividuals(extensionContributors)
-
-    return (extensionLinks,
-            extensionCategories, categoryExtensions,
-            organizationExtensions,
-            individualExtensions, individualOrganizations)
+    return moduleLinks
 
 #---------------------------------------------------------------------------
 def getExtensionLauncherAdditionalSettingsFromBuildDirs(slicerExtensionIndexBuildDir):
@@ -1190,23 +1130,36 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
     if slicerVersion is None:
         slicerVersion = getSlicerVersion(slicerBuildDir)
 
-    # Extension metadata
-    (extensionLinks, extensionCategories, categoryExtensions,
-     extensionOrganizations, extensionIndividuals, individualOrganizationsForExtensions) = \
-            getExtensionsMetadata(slicerVersion, wikiName)
+    # Clone repository hosting package metadata
+    cloneRepository(SLICER_PACKAGES_METADATA_GIT_URL, getPackagesMetadataTopLevelDirectory())
+    modulesMetadata = mergeMetadataFiles('slicer-modules-metadata')
 
-    # Module metadata
-    (moduleLinks, moduleCategories, categoryModules,
-     moduleOrganizations, moduleIndividuals, individualOrganizationsForModules) = \
-            getModulesMetadata(wikiName)
+    # Module -> Wiki links
+    moduleLinks = getModuleLinks(wikiName, modulesMetadata)
 
+    # Module -> Categories
+    print("\nCollecting module 'categories with sub-categories'")
+    moduleCategories = getModuleCategories(modulesMetadata)
+
+    # Category[Category[...]] -> Modules
+    categoryModules = getCategoryItems(moduleCategories)
+
+    # Module -> Contributors
+    moduleContributors = getModuleContributors(modulesMetadata)
+
+    # Module: Collect contributing organizations and individuals
+    print("\nCollecting module 'contributing organizations and individuals'")
+    (organizationModules, individualModules,
+     moduleOrganizations, individualOrganizationsForModules) = \
+            getContributingOrganizationsAndIndividuals(moduleContributors)
+
+    # Module -> Extension
     moduleExtensions = getModuleExtensions(getExtensionModules())
+
+    # Module -> Type
     moduleTypes = getModuleTypes(getExtensionModules())
 
-    # Individual metadata
-    individualOrganizations = _merge(dict(individualOrganizationsForExtensions), individualOrganizationsForModules)
-
-    # Module by types
+    # Type -> Modules
     typeModules = {}
     for name in moduleTypes:
         moduleType = moduleTypes[name]
@@ -1215,7 +1168,7 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
         if name in moduleLinks:
             typeModules[moduleType].append(name)
 
-    # Module by extensions
+    # Extension -> Modules
     extensionModules = {}
     for name in moduleExtensions:
         moduleExtension = moduleExtensions[name]
@@ -1223,6 +1176,41 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
             extensionModules[moduleExtension] = []
         if name in moduleLinks:
             extensionModules[moduleExtension].append(name)
+
+    # Clone extensions index
+    repo = cloneRepository(SLICER_EXTENSIONS_INDEX_GIT_URL, getExtensionsIndexTopLevelDirectory())
+    if slicerVersion not in repo.heads:
+        repo.git.checkout('origin/{0}'.format(slicerVersion), b=slicerVersion)
+    # Get latest change
+    repo.git.pull()
+
+    # Extension -> Description files
+    SLICER_EXTENSIONS_SKIP = ['boost', 'Eigen']
+    extensionDescFiles = \
+        getDescriptionFiles(getExtensionsIndexTopLevelDirectory(), SLICER_EXTENSIONS_SKIP)
+
+    # Extension -> Wiki links
+    extensionLinks = \
+        generateItemWikiLinks('Extensions', wikiName, getExtensionHomepages(extensionDescFiles))
+
+    # Extension -> Categories
+    print("\nCollecting module 'categories with sub-categories'")
+    extensionCategories = getExtensionCategories(extensionDescFiles)
+
+    # Category[Category[...]] -> Extensions
+    categoryExtensions = getCategoryItems(extensionCategories)
+
+    # Extension -> Contributors
+    extensionContributors = getExtensionContributors(extensionDescFiles)
+
+    # Extension: Collect contributing organizations and individuals
+    print("\nCollecting extension 'contributing organizations and individuals'")
+    (organizationExtensions, individualExtensions,
+     extensionOrganizations, individualOrganizationsForExtensions) = \
+            getContributingOrganizationsAndIndividuals(extensionContributors)
+
+    # Individual -> Organizations
+    individualOrganizations = _merge(dict(individualOrganizationsForExtensions), individualOrganizationsForModules)
 
     withSectionToc = True
 
@@ -1281,12 +1269,12 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
                     withToc=withSectionToc))
 
     sections.append(itemByPropertyToWiki('Modules', moduleLinks,
-                    "contributing organization", moduleOrganizations,
+                    "contributing organization", organizationModules,
                     linksRenderer=moduleLinksRenderer,
                     withToc=withSectionToc))
 
     sections.append(itemByPropertyToWiki('Modules', moduleLinks,
-                    "contributing individual", moduleIndividuals,
+                    "contributing individual", individualModules,
                     tocEntryRenderer=individualEntryAsWikiListItem,
                     linksRenderer=moduleLinksRenderer,
                     withToc=withSectionToc))
@@ -1308,11 +1296,11 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
                     withToc=withSectionToc))
 
     sections.append(itemByPropertyToWiki('Extensions', extensionLinks,
-                    "contributing organization", extensionOrganizations,
+                    "contributing organization", organizationExtensions,
                     withToc=withSectionToc))
 
     sections.append(itemByPropertyToWiki('Extensions', extensionLinks,
-                    "contributing individual", extensionIndividuals,
+                    "contributing individual", individualExtensions,
                     withToc=withSectionToc))
 
     lines = []
