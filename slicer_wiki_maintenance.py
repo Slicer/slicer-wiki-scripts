@@ -504,7 +504,7 @@ def moduleLinkAsListItem(link, level=0):
     return linkAsWikiListItem(link, level, extras)
 
 #---------------------------------------------------------------------------
-linksAsWikiList = (headerForWikiList, linkAsWikiListItem, headerForWikiList)
+linksAsWikiList = (headerForWikiList, linkAsWikiListItem, footerForWikiList)
 
 # #---------------------------------------------------------------------------
 # def headerForWikiTable():
@@ -526,12 +526,13 @@ def itemByCategoryToWiki(what, links, categories, linksRenderer=linksAsWikiList,
                          tocEntryRenderer=tocEntryAsWikiListItem, withToc=False):
 
     def _traverse(categories, lines, categoryCallback,
-                  itemCallback=None, category=None, level=-1):
+                  itemCallback=None, category=None, level=-1,
+                  lookup=lambda item:item):
         if category:
             lines.append(categoryCallback(category, level))
         if itemCallback and '_ITEMS_' in categories:
             for item in categories['_ITEMS_']:
-                lines.append(itemCallback(item))
+                lines.append(itemCallback(lookup(item)))
         for subcategory in sortKeys(categories):
             if subcategory == '_ITEMS_':
                 continue
@@ -539,7 +540,7 @@ def itemByCategoryToWiki(what, links, categories, linksRenderer=linksAsWikiList,
             _traverse(categories[subcategory], lines, categoryCallback,
                       itemCallback=itemCallback,
                       category=subcategory,
-                      level=level)
+                      level=level, lookup=lookup)
             level = level - 1
 
     title = "{0} by category".format(what)
@@ -555,7 +556,7 @@ def itemByCategoryToWiki(what, links, categories, linksRenderer=linksAsWikiList,
     # content
     _traverse(categories, lines,
               lambda category, level: u"{0} {1} {0}".format("="*(level+2), category),
-              itemCallback=linkAsWikiListItem)
+              itemCallback=linkAsWikiListItem, lookup=lambda item:links[item])
 
     return (title, convertTitleToWikiAnchor(title), lines)
 
@@ -581,7 +582,7 @@ def itemByPropertyToWiki(what, links, description, items,
     if withToc:
         teaser.append("{0} {1}s:".format(len(items), description))
         for name in sortKeys(items):
-            if not name:
+            if not name or len(items[name]) == 0:
                 continue
             teaser.append(tocEntryRenderer(name))
     else:
@@ -589,7 +590,7 @@ def itemByPropertyToWiki(what, links, description, items,
     lines = []
     lines.extend(linksRenderer[0](title, teaser))
     for item in sortKeys(items):
-        if item != "":
+        if item != "" and len(items[item]) > 0:
             lines.append("== {} ==".format(item))
         for name in sortPrettifiedKeys(items[item]):
             if item == "":
@@ -1138,10 +1139,10 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
     moduleLinks = getModuleLinks(wikiName, modulesMetadata)
 
     # Module -> Categories
-    print("\nCollecting module 'categories with sub-categories'")
     moduleCategories = getModuleCategories(modulesMetadata)
 
     # Category[Category[...]] -> Modules
+    print("\nCollecting module 'categories with sub-categories'")
     categoryModules = getCategoryItems(moduleCategories)
 
     # Module -> Contributors
@@ -1171,6 +1172,8 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
     # Extension -> Modules
     extensionModules = {}
     for name in moduleExtensions:
+        if name == 'builtin':
+            pass
         moduleExtension = moduleExtensions[name]
         if moduleExtension not in extensionModules:
             extensionModules[moduleExtension] = []
@@ -1194,10 +1197,10 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
         generateItemWikiLinks('Extensions', wikiName, getExtensionHomepages(extensionDescFiles))
 
     # Extension -> Categories
-    print("\nCollecting module 'categories with sub-categories'")
     extensionCategories = getExtensionCategories(extensionDescFiles)
 
     # Category[Category[...]] -> Extensions
+    print("\nCollecting module 'categories with sub-categories'")
     categoryExtensions = getCategoryItems(extensionCategories)
 
     # Extension -> Contributors
@@ -1211,6 +1214,36 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
 
     # Individual -> Organizations
     individualOrganizations = _merge(dict(individualOrganizationsForExtensions), individualOrganizationsForModules)
+
+    # Extension -> Links:  Working / Broken
+    availableExtensionLinks = \
+        {name: link for (name, link) in extensionLinks.iteritems() if name in extensionModules}
+    brokenExtensionLinks = \
+        {name: link for (name, link) in extensionLinks.iteritems() if name not in extensionModules}
+
+    # Category[Category[...]] -> Extensions:  Working / Broken
+    availableExtensionCategories = \
+        {name: categories for (name, categories) in extensionCategories.iteritems() if name in extensionModules}
+    categoryAvailableExtensions = getCategoryItems(availableExtensionCategories)
+    brokenExtensionCategories = \
+        {name: categories for (name, categories) in extensionCategories.iteritems() if name not in extensionModules}
+    categoryBrokenExtensions = getCategoryItems(brokenExtensionCategories)
+
+    # Organization -> Extensions:  Working / Broken
+    organizationAvailableExtensions = \
+        {organization: filter(lambda name: name in extensionModules, extensions) \
+            for (organization, extensions) in organizationExtensions.iteritems() }
+    organizationBrokenExtensions = \
+        {organization: filter(lambda name: name not in extensionModules, extensions) \
+            for (organization, extensions) in organizationExtensions.iteritems() }
+
+    # Individual -> Extensions:  Working / Broken
+    individualAvailableExtensions = \
+        {individual: filter(lambda name: name in extensionModules, extensions) \
+            for (individual, extensions) in individualExtensions.iteritems() }
+    individualBrokenExtensions = \
+        {individual: filter(lambda name: name not in extensionModules, extensions) \
+            for (individual, extensions) in individualExtensions.iteritems() }
 
     withSectionToc = True
 
@@ -1285,23 +1318,40 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
                     withToc=withSectionToc))
 
     sections.append(itemByPropertyToWiki('Modules', moduleLinks,
-                    "extension", extensionModules,
+                    "available extension", extensionModules,
                     linksRenderer=moduleLinksRenderer,
                     withToc=withSectionToc))
 
-    sections.append(itemByNameToWiki('Extensions', extensionLinks))
+    # Working extensions
+    sections.append(itemByNameToWiki('Available extensions', availableExtensionLinks))
 
-    sections.append(itemByCategoryToWiki('Extensions', extensionLinks,
-                    categoryExtensions,
+    sections.append(itemByCategoryToWiki('Available extensions', extensionLinks,
+                    categoryAvailableExtensions,
                     withToc=withSectionToc))
 
-    sections.append(itemByPropertyToWiki('Extensions', extensionLinks,
-                    "contributing organization", organizationExtensions,
+    sections.append(itemByPropertyToWiki('Available extensions', extensionLinks,
+                    "contributing organization", organizationAvailableExtensions,
                     withToc=withSectionToc))
 
-    sections.append(itemByPropertyToWiki('Extensions', extensionLinks,
-                    "contributing individual", individualExtensions,
+    sections.append(itemByPropertyToWiki('Available extensions', extensionLinks,
+                    "contributing individual", individualAvailableExtensions,
                     withToc=withSectionToc))
+
+    # Broken extensions
+    sections.append(itemByNameToWiki('Broken extensions', brokenExtensionLinks))
+
+    sections.append(itemByCategoryToWiki('Broken extensions', extensionLinks,
+                    categoryBrokenExtensions,
+                    withToc=withSectionToc))
+
+    sections.append(itemByPropertyToWiki('Broken extensions', extensionLinks,
+                    "contributing organization", organizationBrokenExtensions,
+                    withToc=withSectionToc))
+
+    sections.append(itemByPropertyToWiki('Broken extensions', extensionLinks,
+                    "contributing individual", individualBrokenExtensions,
+                    withToc=withSectionToc))
+
 
     lines = []
     if withSectionToc:
