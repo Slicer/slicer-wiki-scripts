@@ -614,7 +614,13 @@ def itemByPropertyToWiki(what, links, description, items,
 def getMetadataFiles(prefix):
     """Return a list of files associated with ``prefix``.
     """
-    return glob.glob(os.path.join(getPackagesMetadataDataDirectory(), '{0}_*.json'.format(prefix)))
+    targetDir = getPackagesMetadataDataDirectory()
+    print("\nScanning directory '{0}' using prefix '{1}'".format(targetDir, prefix))
+    files = glob.glob(os.path.join(targetDir, '{0}_*.json'.format(prefix)))
+    print("\nFound {0} file(s) matching prefix '{1}'".format(len(files), prefix))
+    for file in files:
+        print("  {}".format(file))
+    return files
 
 #---------------------------------------------------------------------------
 def _merge(a, b, path=None):
