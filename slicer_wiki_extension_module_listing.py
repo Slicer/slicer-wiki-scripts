@@ -1235,7 +1235,8 @@ def publishContentToWiki(wikiName, page, lines, comment=None):
     print(result)
 
 #---------------------------------------------------------------------------
-def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion=None):
+def updateWiki(slicerBuildDir, landingPage,
+        wikiName='slicer', updateWiki=True, slicerVersion=None):
 
     try:
         import mwclient
@@ -1413,8 +1414,10 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
 
     moduleLinksRenderer = (headerForWikiList, moduleLinkAsListItem, footerForWikiList)
 
+    slicerReleaseIdentifier = getSlicerReleaseIdentifier(slicerVersion)
+
     # Wiki pages names
-    page = 'User:UpdateBot/Issue-2843-Consolidated-Extension-List'
+    page = '{0}/{1}/ModuleExtensionListing'.format(landingPage, slicerReleaseIdentifier)
     tocSubPage = "{0}/TOC".format(page)
 
     sections = []
@@ -1522,6 +1525,7 @@ def _updateWiki(args):
         loadPersistentCache()
     setCacheEntry("wiki-slicer-password", args.slicer_wiki_password)
     updateWiki(args.slicer_build_dir,
+        args.landing_page,
         updateWiki=not args.no_wiki_update,
         slicerVersion=args.slicer_version)
 
@@ -1574,6 +1578,13 @@ if __name__ == '__main__':
         action='store_true',
         help='disable wiki update')
 
+    testLandingPage = 'User:UpdateBot/Issue-2843-Consolidated-Extension-List'
+    landingPage = 'Documentation'
+    wiki_parser.add_argument('--test-wiki-update', dest='test_wiki_update',
+        action='store_true',
+        help="update test landing page '{0}' instead of regular one '{1}'".format(
+            testLandingPage, landingPage))
+
     wiki_parser.set_defaults(action=_updateWiki)
 
     #--
@@ -1606,5 +1617,10 @@ if __name__ == '__main__':
 
     if 'slicer_build_dir' in args:
         args.slicer_build_dir = os.path.expanduser(args.slicer_build_dir)
+
+    if args.action == _updateWiki:
+        args.landing_page = landingPage
+        if args.test_wiki_update:
+            args.landing_page = testLandingPage
 
     args.action(args)
