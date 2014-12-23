@@ -1114,6 +1114,55 @@ def _saveAllExtensionsModulesMetadata(args):
         updateGithub=not args.no_github_update,
         slicerVersion=args.slicer_version)
 
+#-----------------------------------------------------------------------
+def _isRegularSection(title, anchor, content):
+    return title and anchor and content
+
+#-----------------------------------------------------------------------
+def _isRawSection(title, anchor, content):
+    return not title and not anchor and content
+
+#-----------------------------------------------------------------------
+def _isRawTocEntry(title, anchor, content):
+    return title and not anchor and not content
+
+#-----------------------------------------------------------------------
+def createRawSection(txt):
+    return (None, None, [txt])
+
+#-----------------------------------------------------------------------
+def createRawTocEntry(txt):
+    return (txt, None, None)
+
+#-----------------------------------------------------------------------
+def generateWikiToc(sections):
+    lines = []
+    lines.append('__NOTOC__')
+    for (title, anchor, content) in sections:
+        if _isRegularSection(title, anchor, content):
+            lines.append("* [[{0}|{1}]]".format(anchor, title))
+        elif _isRawTocEntry(title, anchor, content):
+            lines.append(title)
+    return lines
+
+#-----------------------------------------------------------------------
+def generateWikiSections(sections):
+    lines = []
+    for (title, anchor, content) in sections:
+        if _isRegularSection(title, anchor, content) or \
+                _isRawSection(title, anchor, content):
+            lines.extend(content)
+    return lines
+
+#-----------------------------------------------------------------------
+def publishContentToWiki(wikiName, page, lines, comment=None):
+    if not comment:
+        comment = ("This page has been updated based on the list of extension "
+                  "description files available on the ExtensionsIndex")
+
+    result = saveWikiPage(wikiName, page, comment, "\n".join(lines))
+    print(result)
+
 #---------------------------------------------------------------------------
 def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion=None):
 
@@ -1287,11 +1336,20 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
     setCacheEntry("moduleTypes", moduleTypes)
     setCacheEntry("individualOrganizations", individualOrganizations)
 
-    moduleLinksRenderer = (headerForWikiList, moduleLinkAsListItem, headerForWikiList)
+    moduleLinksRenderer = (headerForWikiList, moduleLinkAsListItem, footerForWikiList)
 
-    # Generate wiki page
+    # Wiki pages names
+    page = 'User:UpdateBot/Issue-2843-Consolidated-Extension-List'
+    tocSubPage = "{0}/TOC".format(page)
+
     sections = []
 
+    # Transclude toc subpage
+    if withSectionToc:
+        sections.append(createRawSection("__NOTOC__"))
+        sections.append(createRawSection("{{{{:{0}}}}}".format(tocSubPage)))
+
+    # Add sections
     sections.append(itemByNameToWiki('Modules',
                     moduleLinksFiltered,
                     linksRenderer=moduleLinksRenderer))
@@ -1317,8 +1375,6 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
                     linksRenderer=moduleLinksRenderer,
                     withToc=withSectionToc))
 
-    sections.append(("<br>Available extensions:" ,None, None))
-
     sections.append(itemByPropertyToWiki('Modules', moduleLinks,
                     "extension", extensionModules,
                     linksRenderer=moduleLinksRenderer,
@@ -1340,8 +1396,27 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
                     tocEntryRenderer=individualEntryAsWikiListItem,
                     withToc=withSectionToc))
 
+    # Add reference to list of broken extensions
+    brokenPage = "{0}/Broken".format(page)
+    brokenLink = wikiPageToWikiLink(brokenPage, "List of extensions known to be broken")
+    sections.append(createRawTocEntry("<br><small>{0}</small>".format(brokenLink)))
+
+    content = generateWikiSections(sections)
+    if updateWiki:
+        publishContentToWiki(wikiName, page, content)
+
+    # Generate toc subpage
+    if withSectionToc:
+        toc = generateWikiToc(sections)
+        if updateWiki:
+            publishContentToWiki(wikiName, tocSubPage, toc)
+
     # Broken extensions
-    sections.append(("<br>Broken extensions:" ,None, None))
+    sections = []
+
+    sections.append(createRawTocEntry(
+        "This page lists all extensions known to be broken on "
+        "all supported platforms."))
 
     sections.append(itemByNameToWiki('Broken extensions', brokenExtensionLinks))
 
@@ -1358,25 +1433,13 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
                     tocEntryRenderer=individualEntryAsWikiListItem,
                     withToc=withSectionToc))
 
-
-    lines = []
+    content = []
     if withSectionToc:
-        lines.append('__NOTOC__')
-        for (title, anchor, content) in sections:
-            if content:
-                lines.append("* [[{0}|{1}]]".format(anchor, title))
-            else:
-                lines.append(title)
-
-    for (title, anchor, content) in sections:
-        if content:
-            lines.extend(content)
+        content.extend(generateWikiToc(sections))
+    content.extend(generateWikiSections(sections))
 
     if updateWiki:
-        result = saveWikiPage(wikiName, 'User:UpdateBot/Issue-2843-Consolidated-Extension-List', \
-                     "This page has been updated based on the list of extension description files available on the ExtensionsIndex", \
-                     "\n".join(lines))
-        print(result)
+        publishContentToWiki(wikiName, brokenPage, content)
 
 #---------------------------------------------------------------------------
 def _updateWiki(args):
