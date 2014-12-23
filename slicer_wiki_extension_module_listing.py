@@ -221,9 +221,14 @@ def urlToWikiLink(url, name):
     return "[{0} {1}]".format(url, name)
 
 #---------------------------------------------------------------------------
-def _generateWikiLink(type_, what, name, linkName, url=None):
+def _generateWikiLink(type_, what, name, linkName, url=None, slicerVersion=None):
     if type_ == WIKI_LINK_INTERNAL:
-        page = "Documentation/Nightly/{what}/{name}".format(what=what, name=name)
+        if not slicerVersion:
+            raise RuntimeError, ("slicerVersion parameter is required when "
+                "specifying WIKI_LINK_INTERNAL wiki link type.")
+        release = getSlicerReleaseIdentifier(slicerVersion)
+        page = "Documentation/{release}/{what}/{name}".format(
+            release=release, what=what, name=name)
         return wikiPageToWikiLink(page, linkName)
     elif type_ == WIKI_LINK_EXTERNAL:
         return  urlToWikiLink(url, linkName)
@@ -231,28 +236,33 @@ def _generateWikiLink(type_, what, name, linkName, url=None):
         return linkName
 
 #---------------------------------------------------------------------------
-def _createLinkItem(type_, what, name, linkName, url=None):
+def _createLinkItem(type_, what, name, linkName, url=None, slicerVersion=None):
     return {'name' : name,
-            'wikilink' : _generateWikiLink(type_, what, name, linkName, url=url),
+            'wikilink' : _generateWikiLink(type_, what, name, linkName, url=url, slicerVersion=slicerVersion),
             'type' : type_,
             'url' : url}
 
 #---------------------------------------------------------------------------
-def generateItemWikiLinks(what, wikiName, homepages):
+def generateItemWikiLinks(what, wikiName, homepages, slicerVersion=None):
 
-    print("\nGenerating {0} wiki links:".format(what))
+    if slicerVersion is None:
+        slicerVersion = getSlicerVersion(slicerBuildDir)
+
+    releaseIdentifier = getSlicerReleaseIdentifier(slicerVersion)
+
+    print("\nGenerating {0} wiki links for Slicer {1}:".format(what, releaseIdentifier))
 
     wikiLinks = {}
     for idx, (name, homepage) in enumerate(homepages.iteritems()):
         if idx % 5 == 0:
             print("  {:.0%}".format(float(idx) / len(homepages)))
 
-        item = _createLinkItem(WIKI_LINK_INTERNAL, what, name, prettify(name))
+        item = _createLinkItem(WIKI_LINK_INTERNAL, what, name, prettify(name), slicerVersion=slicerVersion)
 
         # If wiki page does NOT exist use the homepage link provided in the description file
-        if not wikiPageExists(wikiName, "Documentation/Nightly/{0}/{1}".format(what, name)):
+        if not wikiPageExists(wikiName, "Documentation/{0}/{1}/{2}".format(releaseIdentifier, what, name)):
             if homepage:
-                item = _createLinkItem(WIKI_LINK_EXTERNAL, what, name, prettify(name), homepage)
+                item = _createLinkItem(WIKI_LINK_EXTERNAL, what, name, prettify(name), url=homepage)
             else:
                 item = _createLinkItem(WIKI_LINK_OFF, what, name, prettify(name))
 
@@ -672,10 +682,10 @@ def getExtensionsIndexTopLevelDirectory():
     return os.path.join(tempfile.gettempdir(), 'slicer-extensions-index')
 
 #---------------------------------------------------------------------------
-def getModuleLinks(wikiName, modulesMetadata):
+def getModuleLinks(wikiName, modulesMetadata, slicerVersion=None):
     moduleLinks = \
         generateItemWikiLinks('Modules', wikiName,
-            {name:"" for name in modulesMetadata.keys()})
+            {name:"" for name in modulesMetadata.keys()}, slicerVersion)
     return moduleLinks
 
 #---------------------------------------------------------------------------
@@ -785,24 +795,51 @@ def getSlicerVersion(slicerBuildDir):
     p = slicerLauncherPopen(getSlicerLauncher(slicerBuildDir), ['--version'])
     if p is None:
         return None
-    output = p.stdout.read() # Slicer X.Y.Z[-YYYY-MM-DD]
-    version = re.findall(r'^Slicer (\d\.\d)', output)[0]
-    print("\nAuto-discovered Slicer version is {}".format(version))
+    version = p.stdout.read().strip() # Slicer X.Y.Z[-YYYY-MM-DD]
+
+    print("\nAuto-discovered version is '{0}' [major.minor:{1}, release:{2}]".format(
+        version,
+        getSlicerMajorMinorVersion(version),
+        isSlicerReleaseVersion(version)))
     return version
 
 #---------------------------------------------------------------------------
-def getModuleDirectories(basePath, slicerVersion):
+def getSlicerMajorMinorVersion(slicerVersion):
+    version = re.findall(r'^Slicer (\d\.\d)', slicerVersion)[0]
+    return version
+
+#---------------------------------------------------------------------------
+def isSlicerReleaseVersion(slicerVersion):
+    """Return True if the given slicer version corresponds to a
+    Slicer release.
+    >>> isSlicerReleaseVersion('foo')
+    False
+    >>> [isSlicerReleaseVersion('Slicer {}'.format(v)) for v in ['4.4', '4.4.1', '4.4.1-3']]
+    [True, True, True]
+    >>> [isSlicerReleaseVersion('Slicer {}-2014-12-23'.format(v)) for v in ['4.4', '4.4.1', '4.4.1-3']]
+    [False, False, False]
+    >>> [isSlicerReleaseVersion('Slicer {}-SomeText'.format(v)) for v in ['4.4', '4.4.1', '4.4.1-3']]
+    [False, False, False]
+    >>> [isSlicerReleaseVersion('Slicer {}-A'.format(v)) for v in ['4.4', '4.4.1', '4.4.1-3']]
+    [False, False, False]
+    >>> [isSlicerReleaseVersion('Slicer {}-0'.format(v)) for v in ['4.4', '4.4.1', '4.4.1-3']]
+    [False, True, False]
+    """
+    return re.match(r'^Slicer \d\.\d(\.\d(\-\d)?)?$', slicerVersion) is not None
+
+#---------------------------------------------------------------------------
+def getModuleDirectories(basePath, slicerMajorMinorVersion):
     """Recursively walk ``basepath`` directory and return the list of directory expected
     to contain cli, scripted or loadable modules.
     """
     output = []
     for subdir in ['cli-modules', 'qt-loadable-modules', 'qt-scripted-modules']:
-        moduleDir = os.path.join(basePath, 'lib', 'Slicer-{0}'.format(slicerVersion), subdir)
+        moduleDir = os.path.join(basePath, 'lib', 'Slicer-{0}'.format(slicerMajorMinorVersion), subdir)
         if os.path.isdir(moduleDir):
             output.append(moduleDir)
     if os.path.isdir(basePath):
         for dirname in os.listdir(basePath):
-            output.extend(getModuleDirectories(os.path.join(basePath, dirname), slicerVersion))
+            output.extend(getModuleDirectories(os.path.join(basePath, dirname), slicerMajorMinorVersion))
     return output
 
 #---------------------------------------------------------------------------
@@ -907,60 +944,76 @@ def getModuleNamesByType(modulePaths):
     return results
 
 #---------------------------------------------------------------------------
-def getBuiltinModulesFromBuildDir(slicerBuildDir, slicerVersion=None):
+def getBuiltinModulesFromBuildDir(slicerBuildDir, slicerMajorMinorVersion=None):
     """Return list of Slicer built-in module.
     """
-    if slicerVersion is None:
-        slicerVersion = getSlicerVersion(slicerBuildDir)
-    return getModuleNamesByType(getModuleDirectories(slicerBuildDir, slicerVersion))
+    if slicerMajorMinorVersion is None:
+        slicerMajorMinorVersion = getSlicerMajorMinorVersion(getSlicerVersion(slicerBuildDir))
+    return getModuleNamesByType(getModuleDirectories(slicerBuildDir, slicerMajorMinorVersion))
 
 #---------------------------------------------------------------------------
-def getExtensionModuleDirectoriesFromBuildDirs(slicerBuildDir, slicerExtensionIndexBuildDir, slicerVersion=None):
+def getExtensionModuleDirectoriesFromBuildDirs(slicerBuildDir, slicerExtensionIndexBuildDir, slicerMajorMinorVersion=None):
     """Return a dictionnary of extension names with corresponding module directories.
     """
     data = {}
-    if slicerVersion is None:
-        slicerVersion = getSlicerVersion(slicerBuildDir)
+    if slicerMajorMinorVersion is None:
+        slicerMajorMinorVersion = getSlicerMajorMinorVersion(getSlicerVersion(slicerBuildDir))
     for dirname in os.listdir(slicerExtensionIndexBuildDir):
         if os.path.isdir(os.path.join(slicerExtensionIndexBuildDir, dirname)):
             if dirname.endswith('-build'):
                 extensionName = dirname.replace('-build', '')
-                data[extensionName] = getModuleDirectories(os.path.join(slicerExtensionIndexBuildDir, dirname), slicerVersion)
+                data[extensionName] = getModuleDirectories(os.path.join(slicerExtensionIndexBuildDir, dirname), slicerMajorMinorVersion)
     return data
 
 #---------------------------------------------------------------------------
-def getExtensionModulesFromBuildDirs(slicerBuildDir, slicerExtensionIndexBuildDir, slicerVersion=None):
+def getExtensionModulesFromBuildDirs(slicerBuildDir, slicerExtensionIndexBuildDir, slicerMajorMinorVersion=None):
     """Return a dictionnary of extension names with corresponding module names.
 
     .. note::
         Slicer built-in modules are associated with the special extension name ``builtin``.
         See :func:`getBuiltinModulesFromBuildDir`
     """
-    if slicerVersion is None:
-        slicerVersion = getSlicerVersion(slicerBuildDir)
+    if slicerMajorMinorVersion is None:
+        slicerMajorMinorVersion = getSlicerMajorMinorVersion(getSlicerVersion(slicerBuildDir))
 
     data = {}
 
-    extensionModuleDirectories = getExtensionModuleDirectoriesFromBuildDirs(slicerBuildDir, slicerExtensionIndexBuildDir, slicerVersion)
+    extensionModuleDirectories = getExtensionModuleDirectoriesFromBuildDirs(slicerBuildDir, slicerExtensionIndexBuildDir, slicerMajorMinorVersion)
     for extensionName, extensionModuleDirectory in extensionModuleDirectories.iteritems():
         data[extensionName] = getModuleNamesByType(extensionModuleDirectory)
 
-    data['builtin'] = getBuiltinModulesFromBuildDir(slicerBuildDir, slicerVersion)
+    data['builtin'] = getBuiltinModulesFromBuildDir(slicerBuildDir, slicerMajorMinorVersion)
 
     return data
 
 #---------------------------------------------------------------------------
-def outputFilePath(path, prefix, system=None, withDate=False):
-    """ Return file name suffixed with platform name and optionally today's date::
+def getSlicerReleaseIdentifier(slicerVersion):
+    """Return 'Nightly' if the given slicerVersion is *NOT* a release.
+    Otherwise return '<major>.<minor>'.
 
-            <path>/<prefix>_(Linux|Darwin|Windows)[_YYYY-MM-DD].json
+    See :func:`isSlicerReleaseVersion`
     """
+    slicerMajorMinorVersion = getSlicerMajorMinorVersion(slicerVersion)
+    slicerRelease = isSlicerReleaseVersion(slicerVersion)
+    return ('Nightly' if not slicerRelease else slicerMajorMinorVersion)
+
+#---------------------------------------------------------------------------
+
+def outputFilePath(path, prefix, system=None, slicerVersion=None, withDate=False):
+    """ Return file name suffixed with platform name and optionally slicer
+    version and/or today's date::
+
+            <path>/<prefix>[_(X.Y|Nightly)]_(Linux|Darwin|Windows)[_YYYY-MM-DD].json
+    """
+    version = ""
+    if slicerVersion:
+        version += "_" + getSlicerReleaseIdentifier(slicerVersion)
     if system is None:
         system = platform.system()
     date = ""
     if withDate:
-        date = "_" + datetime.date.today().isoformat()
-    fileName = '{0}_{1}{2}.json'.format(prefix, system, date)
+        date += "_" + datetime.date.today().isoformat()
+    fileName = '{0}{1}_{2}{3}.json'.format(prefix, version, system, date)
     return os.path.join(path, fileName)
 
 #---------------------------------------------------------------------------
@@ -995,29 +1048,36 @@ def getLoadedModulesMetadata():
     return metadata
 
 #---------------------------------------------------------------------------
-def getModulesMetadataFilePath(system=None):
-    return outputFilePath(getPackagesMetadataDataDirectory(), 'slicer-modules-metadata', system=system)
+def getModulesMetadataFilePath(slicerVersion, system=None):
+    return outputFilePath(getPackagesMetadataDataDirectory(),
+        'slicer-modules-metadata', system=system, slicerVersion=slicerVersion)
 
 #---------------------------------------------------------------------------
-def saveLoadedModulesMetadata():
+def saveLoadedModulesMetadata(slicerVersion):
     """Save metadata associated with modules loaded in Slicer.
     """
-    save(getModulesMetadataFilePath(), getLoadedModulesMetadata())
+
+    if not slicerVersion:
+        raise RuntimeError, "slicerVersion parameter is required"
+
+    save(getModulesMetadataFilePath(slicerVersion), getLoadedModulesMetadata())
 
     slicer.app.quit()
 
 #---------------------------------------------------------------------------
 def _saveLoadedModulesMetadata(args):
-    saveLoadedModulesMetadata()
+    saveLoadedModulesMetadata(slicerVersion=args.slicer_version)
 
 #---------------------------------------------------------------------------
-def getExtensionModulesFilePath(system=None):
-    return outputFilePath(getPackagesMetadataDataDirectory(), 'slicer-extension-modules', system=system)
+def getExtensionModulesFilePath(slicerVersion, system=None):
+    return outputFilePath(getPackagesMetadataDataDirectory(),
+        'slicer-extension-modules', system=system, slicerVersion=slicerVersion)
 
 #---------------------------------------------------------------------------
-def getExtensionModules():
+def getExtensionModules(slicerVersion):
     cloneRepository(SLICER_PACKAGES_METADATA_GIT_URL, getPackagesMetadataTopLevelDirectory())
-    return mergeMetadataFiles('slicer-extension-modules')
+    return mergeMetadataFiles('slicer-extension-modules_{0}'.format(
+        getSlicerReleaseIdentifier(slicerVersion)))
 
 #---------------------------------------------------------------------------
 def getModuleTypes(extensionModules):
@@ -1061,6 +1121,8 @@ def saveAllExtensionsModulesMetadata(slicerBuildDir, slicerExtensionIndexBuildDi
     if slicerVersion is None:
         slicerVersion = getSlicerVersion(slicerBuildDir)
 
+    slicerMajorMinorVersion = getSlicerMajorMinorVersion(slicerVersion)
+
     # Clone repository
     repo = cloneRepository(SLICER_PACKAGES_METADATA_GIT_URL, getPackagesMetadataTopLevelDirectory())
 
@@ -1069,7 +1131,7 @@ def saveAllExtensionsModulesMetadata(slicerBuildDir, slicerExtensionIndexBuildDi
     launcherArgs = ['--launcher-additional-settings', mergedSettingsFile]
 
     extensionModuleDirectories = \
-        getExtensionModuleDirectoriesFromBuildDirs(slicerBuildDir, slicerExtensionIndexBuildDir, slicerVersion).values()
+        getExtensionModuleDirectoriesFromBuildDirs(slicerBuildDir, slicerExtensionIndexBuildDir, slicerMajorMinorVersion).values()
     # Flatten list
     extensionModuleDirectories = [item for sublist in extensionModuleDirectories for item in sublist]
 
@@ -1078,6 +1140,8 @@ def saveAllExtensionsModulesMetadata(slicerBuildDir, slicerExtensionIndexBuildDi
     launcherArgs.append('--python-script')
     launcherArgs.append(os.path.realpath(__file__))
     launcherArgs.append('save-loaded-modules-metadata')
+    launcherArgs.append('--slicer-version')
+    launcherArgs.append(slicerVersion)
 
     if len(extensionModuleDirectories) > 0:
         launcherArgs.append('--additional-module-paths')
@@ -1087,16 +1151,17 @@ def saveAllExtensionsModulesMetadata(slicerBuildDir, slicerExtensionIndexBuildDi
     p = slicerLauncherPopen(launcher, launcherArgs)
     if p is None:
         return None
-    print("\nSaved '{0}'".format(getModulesMetadataFilePath()))
+    print("\nSaved '{0}'".format(getModulesMetadataFilePath(slicerVersion)))
 
-    data = getExtensionModulesFromBuildDirs(slicerBuildDir, slicerExtensionIndexBuildDir, slicerVersion)
-    save(getExtensionModulesFilePath(), data)
+    data = getExtensionModulesFromBuildDirs(slicerBuildDir, slicerExtensionIndexBuildDir, slicerMajorMinorVersion)
+    save(getExtensionModulesFilePath(slicerVersion), data)
 
     if updateGithub:
         index = repo.index
-        index.add([getModulesMetadataFilePath()])
-        index.add([getExtensionModulesFilePath()])
-        msg = "Update modules-metadata and modules-by-extension listings for {0} platform".format(platform.system())
+        index.add([getModulesMetadataFilePath(slicerVersion)])
+        index.add([getExtensionModulesFilePath(slicerVersion)])
+        msg = ("Update modules-metadata and modules-by-extension listings"
+            " on {0} platform for {1}".format(platform.system(), slicerVersion))
         index.commit(msg)
         print("\nCommit: {0}".format(msg))
         repo.remotes.origin.push(repo.head)
@@ -1180,12 +1245,15 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
     if slicerVersion is None:
         slicerVersion = getSlicerVersion(slicerBuildDir)
 
+    slicerMajorMinorVersion = getSlicerMajorMinorVersion(slicerVersion)
+
     # Clone repository hosting package metadata
     cloneRepository(SLICER_PACKAGES_METADATA_GIT_URL, getPackagesMetadataTopLevelDirectory())
-    modulesMetadata = mergeMetadataFiles('slicer-modules-metadata')
+    modulesMetadata = mergeMetadataFiles('slicer-modules-metadata_{0}'.format(
+        getSlicerReleaseIdentifier(slicerVersion)))
 
     # Module -> Wiki links
-    moduleLinks = getModuleLinks(wikiName, modulesMetadata)
+    moduleLinks = getModuleLinks(wikiName, modulesMetadata, slicerVersion)
 
     # Module -> Categories
     moduleCategories = getModuleCategories(modulesMetadata)
@@ -1204,10 +1272,10 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
             getContributingOrganizationsAndIndividuals(moduleContributors)
 
     # Module -> Extension
-    moduleExtensions = getModuleExtensions(getExtensionModules())
+    moduleExtensions = getModuleExtensions(getExtensionModules(slicerVersion))
 
     # Module -> Type
-    moduleTypes = getModuleTypes(getExtensionModules())
+    moduleTypes = getModuleTypes(getExtensionModules(slicerVersion))
 
     # Type -> Modules
     typeModules = {}
@@ -1231,8 +1299,8 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
 
     # Clone extensions index
     repo = cloneRepository(SLICER_EXTENSIONS_INDEX_GIT_URL, getExtensionsIndexTopLevelDirectory())
-    if slicerVersion not in repo.heads:
-        repo.git.checkout('origin/{0}'.format(slicerVersion), b=slicerVersion)
+    if slicerMajorMinorVersion not in repo.heads:
+        repo.git.checkout('origin/{0}'.format(slicerMajorMinorVersion), b=slicerMajorMinorVersion)
     # Get latest change
     repo.git.pull()
 
@@ -1243,7 +1311,7 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
 
     # Extension -> Wiki links
     extensionLinks = \
-        generateItemWikiLinks('Extensions', wikiName, getExtensionHomepages(extensionDescFiles))
+        generateItemWikiLinks('Extensions', wikiName, getExtensionHomepages(extensionDescFiles), slicerVersion)
 
     # Extension -> Categories
     extensionCategories = getExtensionCategories(extensionDescFiles)
@@ -1309,7 +1377,8 @@ def updateWiki(slicerBuildDir, wikiName='slicer', updateWiki=True, slicerVersion
                                                         'Extensions',
                                                         extensionName,
                                                         prettify(name),
-                                                        extensionItem['url'])
+                                                        extensionItem['url'],
+                                                        slicerVersion)
         return moduleLink
 
     moduleLinks = {k:_updateModuleLink(k, v) for (k,v) in moduleLinks.iteritems()}
@@ -1469,13 +1538,15 @@ if __name__ == '__main__':
             sys.exit(2)
 
     #-----------------------------------------------------------------------
-    def _add_common_args(parser):
-        parser.add_argument('slicer_build_dir',
-            help='path to slicer inner build directory')
+    def _add_common_args(parser, withBuildDir=True):
+        if withBuildDir:
+            parser.add_argument('slicer_build_dir',
+                help='path to slicer inner build directory')
 
         parser.add_argument('--slicer-version', dest='slicer_version', default=None,
             help='slicer version to consider. By default, the slicer version '
-            'is autodiscovered running Slicer build directory.')
+            'is autodiscovered running Slicer build directory. '
+            'For example: \"Slicer 4.4-Nightly\", \"Slicer 4.4\"')
 
     parser = VerboseErrorParser(description='generate and publish Slicer extensions and modules list on the Slicer wiki')
     commands = parser.add_subparsers()
@@ -1502,6 +1573,9 @@ if __name__ == '__main__':
     #--
     save_loaded_parser = commands.add_parser(
         'save-loaded-modules-metadata', help = 'save metadata of all Slicer modules (should be used in running Slice instance)')
+
+    _add_common_args(save_loaded_parser, withBuildDir=False)
+
     save_loaded_parser.set_defaults(action=_saveLoadedModulesMetadata)
 
     #--
