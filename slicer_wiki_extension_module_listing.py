@@ -843,7 +843,7 @@ def getModuleDirectories(basePath, slicerMajorMinorVersion):
         moduleDir = os.path.join(basePath, 'lib', 'Slicer-{0}'.format(slicerMajorMinorVersion), subdir)
         if os.path.isdir(moduleDir):
             output.append(moduleDir)
-    if os.path.isdir(basePath):
+    if os.path.isdir(basePath) and os.path.basename(basePath) not in ['_CPack_Packages']:
         for dirname in os.listdir(basePath):
             output.extend(getModuleDirectories(os.path.join(basePath, dirname), slicerMajorMinorVersion))
     return output
