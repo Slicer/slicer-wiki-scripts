@@ -653,8 +653,10 @@ def mergeMetadataFiles(prefix):
 
 #---------------------------------------------------------------------------
 def cloneRepository(git_url, repo_dir):
-    """Clone ``git_url`` into ``repo_dir``.
-    If a clone already exists, it returns a reference to it.
+    """Clone ``git_url`` into ``repo_dir`` and return a reference to it.
+    If a clone already exists, the latest changes are fetched, then the master
+    branch is hard reset to match 'origin/master', then a reference to the clone
+    is returned.
     """
     if not os.path.isdir(repo_dir):
         git.Repo.clone_from(git_url, repo_dir)
@@ -663,8 +665,12 @@ def cloneRepository(git_url, repo_dir):
     repo = git.Repo(repo_dir)
     print("\nFound '{0}' in '{1}'".format(git_url, repo_dir))
 
-    # Get latest change
-    repo.git.pull()
+    # Fetch latest changes
+    origin = repo.remotes.origin
+    origin.fetch()
+
+    # and reset to match remote
+    repo.git.reset('--hard','origin/master')
 
     return repo
 
