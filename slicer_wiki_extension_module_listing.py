@@ -671,15 +671,18 @@ def checkoutBranch(repo, branch):
     """Discard local ``repo`` changes, fetch remote changes and checkout
     ``branch``.
     """
+    print("\nDiscarding local changes in '{}'".format(repo.working_dir))
     # Discard local changes
     repo.git.reset('--hard','HEAD')
 
     # Fetch changes
     origin = repo.remotes.origin
+    print("\nFetching changes from '{}'".format(origin.url))
     origin.fetch()
 
     # Checkout branch and update branch
     repo.git.checkout(branch)
+    print("\nApplying changes")
     repo.git.reset('--hard','origin/{}'.format(branch))
 
 #---------------------------------------------------------------------------
