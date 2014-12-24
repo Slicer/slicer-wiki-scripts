@@ -652,27 +652,35 @@ def mergeMetadataFiles(prefix):
     return reduce(_merge, [_readJson(filePath) for filePath in getMetadataFiles(prefix)])
 
 #---------------------------------------------------------------------------
-def cloneRepository(git_url, repo_dir):
+def cloneRepository(git_url, repo_dir, branch='master'):
     """Clone ``git_url`` into ``repo_dir`` and return a reference to it.
-    If a clone already exists, the latest changes are fetched, then the master
-    branch is hard reset to match 'origin/master', then a reference to the clone
-    is returned.
+    If a clone already exists, local change are discarded and ``branch``
+    is checked out. Then, a reference to the clone is returned.
     """
     if not os.path.isdir(repo_dir):
         git.Repo.clone_from(git_url, repo_dir)
         print("Cloned '{0}' into '{1}'".format(git_url, repo_dir))
 
     repo = git.Repo(repo_dir)
-    print("\nFound '{0}' in '{1}'".format(git_url, repo_dir))
+    print("\nFound '{0}' in '{1}'".format(git_url, repo.working_dir))
+    checkoutBranch(repo, branch)
+    return repo
 
-    # Fetch latest changes
+#---------------------------------------------------------------------------
+def checkoutBranch(repo, branch):
+    """Discard local ``repo`` changes, fetch remote changes and checkout
+    ``branch``.
+    """
+    # Discard local changes
+    repo.git.reset('--hard','HEAD')
+
+    # Fetch changes
     origin = repo.remotes.origin
     origin.fetch()
 
-    # and reset to match remote
-    repo.git.reset('--hard','origin/master')
-
-    return repo
+    # Checkout branch and update branch
+    repo.git.checkout(branch)
+    repo.git.pull()
 
 #---------------------------------------------------------------------------
 SLICER_PACKAGES_METADATA_GIT_URL = 'git@github.com:Slicer/slicer-packages-metadata'
@@ -1262,8 +1270,6 @@ def updateWiki(slicerBuildDir, landingPage,
     if slicerVersion is None:
         slicerVersion = getSlicerVersion(slicerBuildDir)
 
-    slicerMajorMinorVersion = getSlicerMajorMinorVersion(slicerVersion)
-
     # Clone repository hosting package metadata
     cloneRepository(SLICER_PACKAGES_METADATA_GIT_URL, getPackagesMetadataTopLevelDirectory())
     modulesMetadata = mergeMetadataFiles('slicer-modules-metadata_{0}'.format(
@@ -1314,12 +1320,13 @@ def updateWiki(slicerBuildDir, landingPage,
         if name in moduleLinks:
             extensionModules[moduleExtension].append(name)
 
-    # Clone extensions index
-    repo = cloneRepository(SLICER_EXTENSIONS_INDEX_GIT_URL, getExtensionsIndexTopLevelDirectory())
-    if slicerMajorMinorVersion not in repo.heads:
-        repo.git.checkout('origin/{0}'.format(slicerMajorMinorVersion), b=slicerMajorMinorVersion)
-    # Get latest change
-    repo.git.pull()
+    # Clone extension index
+    extensionsIndexBranch = 'master'
+    if isSlicerReleaseVersion(version):
+        extensionsIndexBranch = getSlicerMajorMinorVersion(slicerVersion)
+    repo = cloneRepository(SLICER_EXTENSIONS_INDEX_GIT_URL,
+                           getExtensionsIndexTopLevelDirectory(),
+                           branch=extensionsIndexBranch)
 
     # Extension -> Description files
     SLICER_EXTENSIONS_SKIP = ['boost', 'Eigen']
