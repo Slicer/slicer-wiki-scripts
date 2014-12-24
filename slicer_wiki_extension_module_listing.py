@@ -794,8 +794,13 @@ def installPip(slicerBuildDir=None):
     with open(filePath, "wb") as fileContents:
         fileContents.write(response.read())
 
+    # XXX See https://github.com/commontk/AppLauncher/issues/57
+    pythonExecutable = _e('python')
+    if sys.platform == 'darwin':
+        pythonExecutable = os.path.join(slicerBuildDir, '../python-install/bin/python')
+
     print("\nInstalling pip")
-    slicerLauncherPopen(getSlicerLauncher(slicerBuildDir), ['--launch', _e('python'), filePath])
+    slicerLauncherPopen(getSlicerLauncher(slicerBuildDir), ['--launch', pythonExecutable, filePath])
 
 #---------------------------------------------------------------------------
 def runPip(args, slicerBuildDir=None):
