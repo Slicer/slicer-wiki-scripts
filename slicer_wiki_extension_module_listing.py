@@ -680,7 +680,7 @@ def checkoutBranch(repo, branch):
 
     # Checkout branch and update branch
     repo.git.checkout(branch)
-    repo.git.pull()
+    repo.git.reset('--hard','origin/{}'.format(branch))
 
 #---------------------------------------------------------------------------
 SLICER_PACKAGES_METADATA_GIT_URL = 'git@github.com:Slicer/slicer-packages-metadata'
