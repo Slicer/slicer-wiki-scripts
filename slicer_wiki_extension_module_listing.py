@@ -1247,10 +1247,31 @@ def generateWikiSections(sections):
     return lines
 
 #-----------------------------------------------------------------------
+def thisScriptNameAndRev():
+    """
+    :return: Script name and script revision.
+    :rtype: tuple
+    """
+    scriptName = os.path.basename(__file__)
+    scriptRevision = None
+    try:
+        repo = git.Repo(os.path.dirname(__file__))
+        scriptRevision = repo.head.commit.hexsha[:7]
+    except:
+        pass
+    return (scriptName, scriptRevision)
+
+#-----------------------------------------------------------------------
 def publishContentToWiki(wikiName, page, lines, comment=None):
     if not comment:
-        comment = ("This page has been updated based on the list of extension "
-                  "description files available on the ExtensionsIndex")
+        (scriptName, scriptRev) = thisScriptNameAndRev()
+        comment = (
+            "This page has been updated using script {scriptName} (rev {scriptRev}).\n"
+            "For more details:\n"
+            "  * https://github.com/Slicer/slicer-wiki-scripts\n"
+            "  * http://wiki.slicer.org/slicerWiki/index.php/Documentation/Nightly/Developers/Build_system/SlicerBot\n"
+            .format(scriptName=scriptName, scriptRev=scriptRev)
+            )
 
     result = saveWikiPage(wikiName, page, comment, "\n".join(lines))
     print(result)
