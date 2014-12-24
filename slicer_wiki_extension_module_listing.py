@@ -709,10 +709,10 @@ def getModuleLinks(wikiName, modulesMetadata, slicerVersion=None):
     return moduleLinks
 
 #---------------------------------------------------------------------------
-def getExtensionLauncherAdditionalSettingsFromBuildDirs(slicerExtensionIndexBuildDir):
+def getExtensionLauncherAdditionalSettingsFromBuildDirs(slicerExtensionsIndexBuildDir):
     launcherSettingsFiles = []
-    for dirname in os.listdir(slicerExtensionIndexBuildDir):
-        extensionBuildDir = os.path.join(slicerExtensionIndexBuildDir, dirname)
+    for dirname in os.listdir(slicerExtensionsIndexBuildDir):
+        extensionBuildDir = os.path.join(slicerExtensionsIndexBuildDir, dirname)
         if os.path.isdir(extensionBuildDir):
             if dirname.endswith('-build'):
                 launcherSettings = getExtensionLauncherSettings(extensionBuildDir)
@@ -752,13 +752,13 @@ def writeLauncherAdditionalSettings(outputSettingsFile, configs):
             fileContents.write('\n')
 
 #---------------------------------------------------------------------------
-def mergeExtensionsLauncherAdditionalSettings(slicerExtensionIndexBuildDir):
+def mergeExtensionsLauncherAdditionalSettings(slicerExtensionsIndexBuildDir):
 
     mergedSettingsFile = getPackagesMetadataTopLevelDirectory() + "AdditionalLauncherSettings.ini"
     print("\nCreating {0}".format(mergedSettingsFile))
 
     # Read extension launcher additional settings
-    settingsFiles = getExtensionLauncherAdditionalSettingsFromBuildDirs(slicerExtensionIndexBuildDir)
+    settingsFiles = getExtensionLauncherAdditionalSettingsFromBuildDirs(slicerExtensionsIndexBuildDir)
     configs = {}
     for settingsFile in settingsFiles:
         readAdditionalLauncherSettings(settingsFile, configs)
@@ -975,22 +975,22 @@ def getBuiltinModulesFromBuildDir(slicerBuildDir, slicerMajorMinorVersion=None):
     return getModuleNamesByType(getModuleDirectories(slicerBuildDir, slicerMajorMinorVersion))
 
 #---------------------------------------------------------------------------
-def getExtensionModuleDirectoriesFromBuildDirs(slicerBuildDir, slicerExtensionIndexBuildDir, slicerMajorMinorVersion=None):
+def getExtensionModuleDirectoriesFromBuildDirs(slicerBuildDir, slicerExtensionsIndexBuildDir, slicerMajorMinorVersion=None):
     """Return a dictionnary of extension names with corresponding module directories.
     """
     data = {}
     if slicerMajorMinorVersion is None:
         slicerMajorMinorVersion = getSlicerMajorMinorVersion(getSlicerVersion(slicerBuildDir))
     print("\nCollecting extension module directories")
-    for dirname in os.listdir(slicerExtensionIndexBuildDir):
-        if os.path.isdir(os.path.join(slicerExtensionIndexBuildDir, dirname)):
+    for dirname in os.listdir(slicerExtensionsIndexBuildDir):
+        if os.path.isdir(os.path.join(slicerExtensionsIndexBuildDir, dirname)):
             if dirname.endswith('-build'):
                 extensionName = dirname.replace('-build', '')
-                data[extensionName] = getModuleDirectories(os.path.join(slicerExtensionIndexBuildDir, dirname), slicerMajorMinorVersion)
+                data[extensionName] = getModuleDirectories(os.path.join(slicerExtensionsIndexBuildDir, dirname), slicerMajorMinorVersion)
     return data
 
 #---------------------------------------------------------------------------
-def getExtensionModulesFromBuildDirs(slicerBuildDir, slicerExtensionIndexBuildDir, slicerMajorMinorVersion=None):
+def getExtensionModulesFromBuildDirs(slicerBuildDir, slicerExtensionsIndexBuildDir, slicerMajorMinorVersion=None):
     """Return a dictionnary of extension names with corresponding module names.
 
     .. note::
@@ -1002,7 +1002,7 @@ def getExtensionModulesFromBuildDirs(slicerBuildDir, slicerExtensionIndexBuildDi
 
     data = {}
 
-    extensionModuleDirectories = getExtensionModuleDirectoriesFromBuildDirs(slicerBuildDir, slicerExtensionIndexBuildDir, slicerMajorMinorVersion)
+    extensionModuleDirectories = getExtensionModuleDirectoriesFromBuildDirs(slicerBuildDir, slicerExtensionsIndexBuildDir, slicerMajorMinorVersion)
     for extensionName, extensionModuleDirectory in extensionModuleDirectories.iteritems():
         data[extensionName] = getModuleNamesByType(extensionModuleDirectory)
 
@@ -1133,7 +1133,7 @@ def getModuleExtensions(extensionModules):
 #     return modules
 
 #---------------------------------------------------------------------------
-def saveAllExtensionsModulesMetadata(slicerBuildDir, slicerExtensionIndexBuildDir,
+def saveAllExtensionsModulesMetadata(slicerBuildDir, slicerExtensionsIndexBuildDir,
         updateGithub=True, slicerVersion=None):
 
     try:
@@ -1150,12 +1150,12 @@ def saveAllExtensionsModulesMetadata(slicerBuildDir, slicerExtensionIndexBuildDi
     # Clone repository
     repo = cloneRepository(SLICER_PACKAGES_METADATA_GIT_URL, getPackagesMetadataTopLevelDirectory())
 
-    mergedSettingsFile = mergeExtensionsLauncherAdditionalSettings(slicerExtensionIndexBuildDir)
+    mergedSettingsFile = mergeExtensionsLauncherAdditionalSettings(slicerExtensionsIndexBuildDir)
 
     launcherArgs = ['--launcher-additional-settings', mergedSettingsFile]
 
     extensionModuleDirectories = \
-        getExtensionModuleDirectoriesFromBuildDirs(slicerBuildDir, slicerExtensionIndexBuildDir, slicerMajorMinorVersion).values()
+        getExtensionModuleDirectoriesFromBuildDirs(slicerBuildDir, slicerExtensionsIndexBuildDir, slicerMajorMinorVersion).values()
     # Flatten list
     extensionModuleDirectories = [item for sublist in extensionModuleDirectories for item in sublist]
 
@@ -1177,7 +1177,7 @@ def saveAllExtensionsModulesMetadata(slicerBuildDir, slicerExtensionIndexBuildDi
         return None
     print("\nSaved '{0}'".format(getModulesMetadataFilePath(slicerVersion)))
 
-    data = getExtensionModulesFromBuildDirs(slicerBuildDir, slicerExtensionIndexBuildDir, slicerMajorMinorVersion)
+    data = getExtensionModulesFromBuildDirs(slicerBuildDir, slicerExtensionsIndexBuildDir, slicerMajorMinorVersion)
     save(getExtensionModulesFilePath(slicerVersion), data)
 
     if updateGithub:
