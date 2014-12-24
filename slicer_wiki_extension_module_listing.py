@@ -745,6 +745,10 @@ def writeLauncherAdditionalSettings(outputSettingsFile, configs):
 
 #---------------------------------------------------------------------------
 def mergeExtensionsLauncherAdditionalSettings(slicerExtensionIndexBuildDir):
+
+    mergedSettingsFile = getPackagesMetadataTopLevelDirectory() + "AdditionalLauncherSettings.ini"
+    print("\nCreating {0}".format(mergedSettingsFile))
+
     # Read extension launcher additional settings
     settingsFiles = getExtensionLauncherAdditionalSettingsFromBuildDirs(slicerExtensionIndexBuildDir)
     configs = {}
@@ -752,7 +756,6 @@ def mergeExtensionsLauncherAdditionalSettings(slicerExtensionIndexBuildDir):
         readAdditionalLauncherSettings(settingsFile, configs)
 
     # Write common launcher additional settings
-    mergedSettingsFile = getPackagesMetadataTopLevelDirectory() + "AdditionalLauncherSettings.ini"
     writeLauncherAdditionalSettings(mergedSettingsFile, configs)
 
     return mergedSettingsFile
@@ -970,6 +973,7 @@ def getExtensionModuleDirectoriesFromBuildDirs(slicerBuildDir, slicerExtensionIn
     data = {}
     if slicerMajorMinorVersion is None:
         slicerMajorMinorVersion = getSlicerMajorMinorVersion(getSlicerVersion(slicerBuildDir))
+    print("\nCollecting extension module directories")
     for dirname in os.listdir(slicerExtensionIndexBuildDir):
         if os.path.isdir(os.path.join(slicerExtensionIndexBuildDir, dirname)):
             if dirname.endswith('-build'):
