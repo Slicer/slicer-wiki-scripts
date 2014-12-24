@@ -1325,7 +1325,7 @@ def updateWiki(slicerBuildDir, landingPage,
 
     # Clone extension index
     extensionsIndexBranch = 'master'
-    if isSlicerReleaseVersion(version):
+    if isSlicerReleaseVersion(slicerVersion):
         extensionsIndexBranch = getSlicerMajorMinorVersion(slicerVersion)
     repo = cloneRepository(SLICER_EXTENSIONS_INDEX_GIT_URL,
                            getExtensionsIndexTopLevelDirectory(),
