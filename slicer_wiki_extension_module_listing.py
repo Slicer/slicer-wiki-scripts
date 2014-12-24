@@ -773,12 +773,17 @@ def mergeExtensionsLauncherAdditionalSettings(slicerExtensionsIndexBuildDir):
 
 #---------------------------------------------------------------------------
 def getSlicerLauncher(slicerBuildDir):
-    launcher = os.path.join(slicerBuildDir, 'Slicer')
-    if sys.platform.startswith('win'):
-        launcher += '.exe'
+    launcher = os.path.join(slicerBuildDir, _e('Slicer'))
     if not os.path.exists(launcher):
         return None
     return launcher
+
+#---------------------------------------------------------------------------
+def _e(name):
+    """Append the executable suffix corresponding to the platform running
+    this script.
+    """
+    return name if not sys.platform.startswith('win') else name + '.exe'
 
 #---------------------------------------------------------------------------
 def installPip(slicerBuildDir=None):
@@ -790,13 +795,13 @@ def installPip(slicerBuildDir=None):
         fileContents.write(response.read())
 
     print("\nInstalling pip")
-    slicerLauncherPopen(getSlicerLauncher(slicerBuildDir), ['--launch', 'python', filePath])
+    slicerLauncherPopen(getSlicerLauncher(slicerBuildDir), ['--launch', _e('python'), filePath])
 
 #---------------------------------------------------------------------------
 def runPip(args, slicerBuildDir=None):
     def _runPip():
         print("\npip {0}".format(" ".join(args)))
-        slicerLauncherPopen(getSlicerLauncher(slicerBuildDir), ['--launch', 'pip'] + args)
+        slicerLauncherPopen(getSlicerLauncher(slicerBuildDir), ['--launch', _e('pip')] + args)
     try:
         _runPip()
     except RuntimeError:
