@@ -566,7 +566,7 @@ def itemByCategoryToWiki(what, links, categories, linksRenderer=linksAsWikiList,
     # content
     _traverse(categories, lines,
               lambda category, level: u"{0} {1} {0}".format("="*(level+2), category),
-              itemCallback=linkAsWikiListItem, lookup=lambda item:links[item])
+              itemCallback=linksRenderer[1], lookup=lambda item:links[item])
 
     return (title, convertTitleToWikiAnchor(title), lines)
 
