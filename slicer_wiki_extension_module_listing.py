@@ -1476,7 +1476,7 @@ def updateWiki(slicerBuildDir, landingPage,
     # Transclude toc subpage
     if withSectionToc:
         sections.append(createRawSection("__NOTOC__"))
-        sections.append(createRawSection("{{{{:{0}}}}}".format(tocSubPage)))
+        sections.append(createRawSection("<noinclude>{{{{:{0}}}}}</noinclude>".format(tocSubPage)))
 
     # Add sections
     sections.append(itemByNameToWiki('Modules',
