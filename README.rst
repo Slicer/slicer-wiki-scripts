@@ -39,7 +39,12 @@ Prerequisites:
 
   pip install --pre gitpython
 
+----------------------------------------
+slicer_extensions_download_statistics.py
+----------------------------------------
 
+This script is useful to retrieve the extension download stats
+grouped by release.
 
 =========
 Licensing
