@@ -1,7 +1,10 @@
+#!/usr/bin/env python
 
 import json
 import urllib
 import urllib2
+import sys
+import argparse
 
 #---------------------------------------------------------------------------
 def getSlicerReleases():
@@ -94,24 +97,26 @@ def getItemById(url, itemId):
     return _call_midas_url(url, data)
 
 #---------------------------------------------------------------------------
-def getExtensionSlicerRevisionAndDownloads(url, extensionName):
+def getExtensionSlicerRevisionAndDownloads(url, extensionName,verbose):
     """Return a dictionnary of slicer revision and download counts for
     the given ``extensionName``.
     """
-    print("\n  Collecting 'extension_id' / 'item_id' pair matching '{0}' name".format(extensionName))
+    if verbose==True:
+        print("\n  Collecting 'extension_id' / 'item_id' pair matching '{0}' name".format(extensionName))
     all_itemids = [(ext['item_id'], ext['extension_id']) for ext in getExtensionListByName(url, extensionName)]
 
     item_rev_downloads = {}
-
-    print("\n  Collecting `slicer_revision` and `download` for 'extension_id' / 'item_id' pair")
+    if verbose==True:
+        print("\n  Collecting `slicer_revision` and `download` for 'extension_id' / 'item_id' pair")
     for (idx, (itemid, extensionid)) in enumerate(all_itemids):
         #print("{0}/{1}".format(idx+1, len(all_itemids)))
-        if idx % 5 == 0:
+        if verbose==True and idx % 5 == 0:
             print("  {:.0%}".format(float(idx) / len(all_itemids)))
 
         item_rev_downloads[itemid] = [getItemById(url, itemid)['download'], getExtensionById(url, extensionid)['slicer_revision']]
 
-    print("\n  Consolidating `download` by 'slicer_revision'")
+    if verbose==True:
+        print("\n  Consolidating `download` by 'slicer_revision'")
     rev_downloads = {}
     for (itemid, downloads_rev) in item_rev_downloads.iteritems():
         downloads = int(downloads_rev[0])
@@ -126,7 +131,7 @@ def getExtensionSlicerRevisionAndDownloads(url, extensionName):
     return {key: rev_downloads[key] for key in sorted(rev_downloads)}
 
 #---------------------------------------------------------------------------
-def getExtensionDownloadStatsByRelease(extension_slicer_revision_downloads):
+def getExtensionDownloadStatsByRelease(extension_slicer_revision_downloads,verbose):
     """Given a dictionnary of slicer_revision and download counts, this function
     return a dictionnary release and download counts.
     Downloads associated with nightly build happening between release A and B are
@@ -157,17 +162,32 @@ def getExtensionDownloadStatsByRelease(extension_slicer_revision_downloads):
     return release_downloads
 
 #---------------------------------------------------------------------------
-def getExtensionDownloadStats(url, extensionName):
+def getExtensionDownloadStats(url, extensionName,verbose):
     """Return download stats associated with ``extensionName``.
     """
-    print("\nRetrieving '{0}' extension download statistics from '{1}' server".format(extensionName, url))
-
-    rev_downloads = getExtensionSlicerRevisionAndDownloads(url, extensionName)
-    print("\n  Grouping `download` by 'release'")
-    return getExtensionDownloadStatsByRelease(rev_downloads)
+    if verbose==True:
+        print("\nRetrieving '{0}' extension download statistics from '{1}' server".format(extensionName, url))
+    rev_downloads = getExtensionSlicerRevisionAndDownloads(url, extensionName,verbose)
+    if verbose==True:
+        print("\n  Grouping `download` by 'release'")
+    return getExtensionDownloadStatsByRelease(rev_downloads,verbose)
 
 
 #---------------------------------------------------------------------------
 if __name__ == '__main__':
+    parser = argparse.ArgumentParser(prog=sys.argv[0],description="Retrieves the extension download statistics grouped by release")
+#    parser.usage('%(prog)s [-h] extension1 [extension2 ...]')
+    parser.add_argument("names", metavar='extensions',nargs='+',help="Extension names")
+    parser.add_argument("-v", "--verbose", help="increase output verbosity",action="store_true")
+    args = parser.parse_args()
+    listExtensions=args.names
+    if args.verbose==True:  
+        print("List of extensions: "+str(listExtensions))
     url = 'http://slicer.kitware.com/midas3/api/json'
-    print(getExtensionDownloadStats(url, 'SPHARM-PDM'))
+    for extensionName in listExtensions:
+        if args.verbose==True:
+            print("*****************************************************")
+            print("*****************************************************")
+            print("Extension Name: "+extensionName)
+            print("*****************************************************")
+        print(extensionName+": "+str(getExtensionDownloadStats(url, extensionName,args.verbose)))
