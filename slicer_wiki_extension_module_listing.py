@@ -1496,14 +1496,14 @@ def updateWiki(slicerBuildDir, landingPage,
         sections.append(createRawSection("<noinclude>{{{{:{0}}}}}</noinclude>".format(tocSubPage)))
 
     # Add sections
-    sections.append(itemByNameToWiki('Modules',
-                    moduleLinksFiltered,
-                    linksRenderer=moduleLinksRenderer))
-
     sections.append(itemByCategoryToWiki('Modules', moduleLinks,
                     categoryModules,
                     linksRenderer=moduleLinksRenderer,
                     withToc=withSectionToc))
+
+    sections.append(itemByNameToWiki('Modules',
+                    moduleLinksFiltered,
+                    linksRenderer=moduleLinksRenderer))
 
     sections.append(itemByPropertyToWiki('Modules', moduleLinks,
                     "contributing organization", organizationModules,
@@ -1527,11 +1527,11 @@ def updateWiki(slicerBuildDir, landingPage,
                     withToc=withSectionToc))
 
     # Working extensions
-    sections.append(itemByNameToWiki('Extensions', availableExtensionLinks))
-
     sections.append(itemByCategoryToWiki('Extensions', extensionLinks,
                     categoryAvailableExtensions,
                     withToc=withSectionToc))
+
+    sections.append(itemByNameToWiki('Extensions', availableExtensionLinks))
 
     sections.append(itemByPropertyToWiki('Extensions', extensionLinks,
                     "contributing organization", organizationAvailableExtensions,
@@ -1564,11 +1564,11 @@ def updateWiki(slicerBuildDir, landingPage,
         "This page lists all extensions known to be broken on "
         "all supported platforms."))
 
-    sections.append(itemByNameToWiki('Broken extensions', brokenExtensionLinks))
-
     sections.append(itemByCategoryToWiki('Broken extensions', extensionLinks,
                     categoryBrokenExtensions,
                     withToc=withSectionToc))
+
+    sections.append(itemByNameToWiki('Broken extensions', brokenExtensionLinks))
 
     sections.append(itemByPropertyToWiki('Broken extensions', extensionLinks,
                     "contributing organization", organizationBrokenExtensions,
