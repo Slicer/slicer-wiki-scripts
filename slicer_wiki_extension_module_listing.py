@@ -5,6 +5,7 @@ import ConfigParser
 import fnmatch
 import glob
 import git
+import io
 import itertools
 import json
 import os
@@ -724,11 +725,28 @@ def getExtensionLauncherAdditionalSettingsFromBuildDirs(slicerExtensionsIndexBui
     return launcherSettingsFiles
 
 #---------------------------------------------------------------------------
+def _readLauncherSettings(settingsFile):
+    """This function read the given ``settingsFile``, trim all lines
+    and return the corresponding buffer.
+
+    .. note::
+        This function is needed for Slicer > r24174. for new version of Slicer,
+        the settings generation has been fixed.
+    """
+    updatedFileContents = []
+    with open(settingsFile) as fileContents:
+        for line in fileContents:
+            updatedFileContents.append(line.lstrip().rstrip('\n'))
+
+    return '\n'.join(updatedFileContents)
+
+#---------------------------------------------------------------------------
 def readAdditionalLauncherSettings(settingsFile, configs):
     """Read ``settingsFile`` and populate the provided ``configs`` dictionnary.
     """
     parser = ConfigParser.ConfigParser()
-    parser.read(settingsFile)
+    settingsFileContents = _readLauncherSettings(settingsFile)
+    parser.readfp(io.BytesIO(settingsFileContents))
     for section in ['LibraryPaths', 'Paths', 'PYTHONPATH', 'QT_PLUGIN_PATH']:
         if not parser.has_section(section):
             continue
@@ -736,7 +754,6 @@ def readAdditionalLauncherSettings(settingsFile, configs):
             configs[section] = []
         for idx in range(parser.getint(section, 'size')):
             configs[section].append(parser.get(section, '{0}\\path'.format(idx+1)))
-
 
 #---------------------------------------------------------------------------
 def writeLauncherAdditionalSettings(outputSettingsFile, configs):
