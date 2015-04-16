@@ -730,7 +730,7 @@ def _readLauncherSettings(settingsFile):
     and return the corresponding buffer.
 
     .. note::
-        This function is needed for Slicer > r24174. for new version of Slicer,
+        This function is needed for Slicer < r24174. For new version of Slicer,
         the settings generation has been fixed.
     """
     updatedFileContents = []
