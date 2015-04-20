@@ -158,7 +158,7 @@ def convertTitleToWikiAnchor(title):
     #   * HTML4-style escaping
     title = title.replace('%3A', ':')
     title = title.replace('%', '.')
-    return '#' + title
+    return title
 
 #---------------------------------------------------------------------------
 def extractExtensionName(descriptionFile):
@@ -465,7 +465,7 @@ def generateContributorsWikiLinks(extensionName, organizations):
 #---------------------------------------------------------------------------
 def tocEntryAsWikiListItem(name, level=0, extras=[]):
     return linkAsWikiListItem(
-        wikiPageToWikiLink(convertTitleToWikiAnchor(name), prettify(name)),
+        wikiPageToWikiLink('#' + convertTitleToWikiAnchor(name), prettify(name)),
         level, extras)
 
 #---------------------------------------------------------------------------
@@ -569,7 +569,7 @@ def itemByCategoryToWiki(what, links, categories, linksRenderer=linksAsWikiList,
               lambda category, level: u"{0} {1} {0}".format("="*(level+2), category),
               itemCallback=linksRenderer[1], lookup=lambda item:links[item])
 
-    return (title, convertTitleToWikiAnchor(title), lines)
+    return (title, '#' + convertTitleToWikiAnchor(title), lines)
 
 #---------------------------------------------------------------------------
 def itemByNameToWiki(what, links, linksRenderer=linksAsWikiList):
@@ -581,7 +581,7 @@ def itemByNameToWiki(what, links, linksRenderer=linksAsWikiList):
     for name in sortPrettifiedKeys(links):
         lines.append(linksRenderer[1](links[name]))
     lines.extend(linksRenderer[2](title, teaser))
-    return (title, convertTitleToWikiAnchor(title), lines)
+    return (title, '#' + convertTitleToWikiAnchor(title), lines)
 
 #---------------------------------------------------------------------------
 def itemByPropertyToWiki(what, links, description, items,
@@ -609,7 +609,7 @@ def itemByPropertyToWiki(what, links, description, items,
                 continue
             lines.append(linksRenderer[1](links[name]))
     lines.extend(linksRenderer[2](title, teaser))
-    return (title, convertTitleToWikiAnchor(title), lines)
+    return (title, '#' + convertTitleToWikiAnchor(title), lines)
 
 #---------------------------------------------------------------------------
 def getMetadataFiles(prefix):
