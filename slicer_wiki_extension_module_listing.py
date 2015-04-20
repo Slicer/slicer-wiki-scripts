@@ -158,7 +158,7 @@ def convertTitleToWikiAnchor(title):
     #   * HTML4-style escaping
     title = title.replace('%3A', ':')
     title = title.replace('%', '.')
-    return '#' + title
+    return title
 
 #---------------------------------------------------------------------------
 def extractExtensionName(descriptionFile):
@@ -463,9 +463,9 @@ def generateContributorsWikiLinks(extensionName, organizations):
             individualLink = "[[#{}|{}]]".format(individual, individual)
 
 #---------------------------------------------------------------------------
-def tocEntryAsWikiListItem(name, level=0, extras=[]):
+def tocEntryAsWikiListItem(name, level=0, anchor=None, extras=[]):
     return linkAsWikiListItem(
-        wikiPageToWikiLink(convertTitleToWikiAnchor(name), prettify(name)),
+        wikiPageToWikiLink('#' + convertTitleToWikiAnchor(name if anchor is None else anchor), prettify(name)),
         level, extras)
 
 #---------------------------------------------------------------------------
@@ -475,7 +475,7 @@ def individualEntryAsWikiListItem(name, level=0):
     if name in individualOrganizations:
         if individualOrganizations[name]:
             extras.append(individualOrganizations[name][0])
-    return tocEntryAsWikiListItem(name, level, extras)
+    return tocEntryAsWikiListItem(name, level, extras=extras)
 
 #---------------------------------------------------------------------------
 def headerForWikiList(title, teaser):
@@ -537,10 +537,13 @@ def itemByCategoryToWiki(what, links, categories, linksRenderer=linksAsWikiList,
                          tocEntryRenderer=tocEntryAsWikiListItem, withToc=False):
 
     def _traverse(categories, lines, categoryCallback,
-                  itemCallback=None, category=None, level=-1,
+                  itemCallback=None,
+                  category=None, completeCategory=None,
+                  level=-1,
                   lookup=lambda item:item):
         if category:
-            lines.append(categoryCallback(category, level))
+            categoryAnchor = sectionAnchor + '_' + convertTitleToWikiAnchor(completeCategory)
+            lines.append(categoryCallback(category, level, categoryAnchor))
         if itemCallback and '_ITEMS_' in categories:
             for item in categories['_ITEMS_']:
                 lines.append(itemCallback(lookup(item)))
@@ -551,11 +554,13 @@ def itemByCategoryToWiki(what, links, categories, linksRenderer=linksAsWikiList,
             _traverse(categories[subcategory], lines, categoryCallback,
                       itemCallback=itemCallback,
                       category=subcategory,
+                      completeCategory=subcategory if category is None else category + '_' + subcategory,
                       level=level, lookup=lookup)
             level = level - 1
 
     title = "{0} by category".format(what)
     print("\nGenerating '%s' section" % title)
+    sectionAnchor = convertTitleToWikiAnchor(title)
     teaser = []
     if withToc:
         teaser.append("{} categories:".format(len(categories)))
@@ -566,10 +571,12 @@ def itemByCategoryToWiki(what, links, categories, linksRenderer=linksAsWikiList,
     lines.extend(headerForWikiList(title, teaser))
     # content
     _traverse(categories, lines,
-              lambda category, level: u"{0} {1} {0}".format("="*(level+2), category),
+              lambda category, level, anchor:
+                u"<span id='{}'></span>\n".format(anchor) +
+                u"{0} {1} {0}".format("="*(level+2), category),
               itemCallback=linksRenderer[1], lookup=lambda item:links[item])
 
-    return (title, convertTitleToWikiAnchor(title), lines)
+    return (title, '#' + sectionAnchor, lines)
 
 #---------------------------------------------------------------------------
 def itemByNameToWiki(what, links, linksRenderer=linksAsWikiList):
@@ -581,7 +588,7 @@ def itemByNameToWiki(what, links, linksRenderer=linksAsWikiList):
     for name in sortPrettifiedKeys(links):
         lines.append(linksRenderer[1](links[name]))
     lines.extend(linksRenderer[2](title, teaser))
-    return (title, convertTitleToWikiAnchor(title), lines)
+    return (title, '#' + convertTitleToWikiAnchor(title), lines)
 
 #---------------------------------------------------------------------------
 def itemByPropertyToWiki(what, links, description, items,
@@ -609,7 +616,7 @@ def itemByPropertyToWiki(what, links, description, items,
                 continue
             lines.append(linksRenderer[1](links[name]))
     lines.extend(linksRenderer[2](title, teaser))
-    return (title, convertTitleToWikiAnchor(title), lines)
+    return (title, '#' + convertTitleToWikiAnchor(title), lines)
 
 #---------------------------------------------------------------------------
 def getMetadataFiles(prefix):
