@@ -1491,6 +1491,18 @@ def updateWiki(slicerBuildDir, landingPage,
 
     slicerReleaseIdentifier = getSlicerReleaseIdentifier(slicerVersion)
 
+    def _publishSection(section):
+        sections = [section]
+        content = []
+        if withSectionToc:
+            sections.append(createRawSection("__NOTOC__"))
+            content.extend(generateWikiToc(sections))
+        content.extend(generateWikiSections(sections))
+        subPage = "{0}/{1}".format(page, convertTitleToWikiAnchor(section[0]))
+        if updateWiki:
+            publishContentToWiki(wikiName, subPage, content)
+        return "* {}".format(wikiPageToWikiLink(subPage, section[0]))
+
     # Wiki pages names
     page = '{0}/{1}/ModuleExtensionListing'.format(landingPage, slicerReleaseIdentifier)
     tocSubPage = "{0}/TOC".format(page)
@@ -1512,42 +1524,51 @@ def updateWiki(slicerBuildDir, landingPage,
                     moduleLinksFiltered,
                     linksRenderer=moduleLinksRenderer))
 
-    sections.append(itemByPropertyToWiki('Modules', moduleLinks,
-                    "contributing organization", organizationModules,
-                    linksRenderer=moduleLinksRenderer,
-                    withToc=withSectionToc))
+    # Create one page per section
+    section = itemByPropertyToWiki('Modules', moduleLinks,
+              "contributing organization", organizationModules,
+              linksRenderer=moduleLinksRenderer,
+              withToc=withSectionToc)
+    sections.append(createRawTocEntry(_publishSection(section)))
 
-    sections.append(itemByPropertyToWiki('Modules', moduleLinks,
-                    "contributing individual", individualModules,
-                    tocEntryRenderer=individualEntryAsWikiListItem,
-                    linksRenderer=moduleLinksRenderer,
-                    withToc=withSectionToc))
+    section = itemByPropertyToWiki('Modules', moduleLinks,
+              "contributing individual", individualModules,
+              tocEntryRenderer=individualEntryAsWikiListItem,
+              linksRenderer=moduleLinksRenderer,
+              withToc=withSectionToc)
+    sections.append(createRawTocEntry(_publishSection(section)))
 
-    sections.append(itemByPropertyToWiki('Modules', moduleLinks,
-                    "type", typeModules,
-                    linksRenderer=moduleLinksRenderer,
-                    withToc=withSectionToc))
+    section = itemByPropertyToWiki('Modules', moduleLinks,
+              "type", typeModules,
+              linksRenderer=moduleLinksRenderer,
+              withToc=withSectionToc)
+    sections.append(createRawTocEntry(_publishSection(section)))
 
-    sections.append(itemByPropertyToWiki('Modules', moduleLinks,
-                    "extension", extensionModules,
-                    linksRenderer=moduleLinksRenderer,
-                    withToc=withSectionToc))
+    section = itemByPropertyToWiki('Modules', moduleLinks,
+              "extension", extensionModules,
+              linksRenderer=moduleLinksRenderer,
+              withToc=withSectionToc)
+    sections.append(createRawTocEntry(_publishSection(section)))
 
     # Working extensions
-    sections.append(itemByCategoryToWiki('Extensions', extensionLinks,
-                    categoryAvailableExtensions,
-                    withToc=withSectionToc))
+    section = itemByCategoryToWiki('Extensions', extensionLinks,
+              categoryAvailableExtensions,
+              withToc=withSectionToc)
+    sections.append(createRawTocEntry(_publishSection(section)))
 
-    sections.append(itemByNameToWiki('Extensions', availableExtensionLinks))
+    section = itemByNameToWiki('Extensions', availableExtensionLinks)
+    sections.append(createRawTocEntry(_publishSection(section)))
 
-    sections.append(itemByPropertyToWiki('Extensions', extensionLinks,
-                    "contributing organization", organizationAvailableExtensions,
-                    withToc=withSectionToc))
+    section = itemByPropertyToWiki('Extensions', extensionLinks,
+              "contributing organization", organizationAvailableExtensions,
+              withToc=withSectionToc)
+    sections.append(createRawTocEntry(_publishSection(section)))
 
-    sections.append(itemByPropertyToWiki('Extensions', extensionLinks,
-                    "contributing individual", individualAvailableExtensions,
-                    tocEntryRenderer=individualEntryAsWikiListItem,
-                    withToc=withSectionToc))
+    section = itemByPropertyToWiki('Extensions', extensionLinks,
+              "contributing individual", individualAvailableExtensions,
+              tocEntryRenderer=individualEntryAsWikiListItem,
+              withToc=withSectionToc)
+    sections.append(createRawTocEntry(_publishSection(section)))
 
     # Add reference to list of broken extensions
     brokenPage = "{0}/Broken".format(page)
