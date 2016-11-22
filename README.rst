@@ -14,6 +14,17 @@ the Slicer wiki.
 Scripts
 =======
 
+
+---------------------------------------
+Slicer/Base/Python/slicer/release/wiki.py
+---------------------------------------
+
+Available in the Slicer source tree, this script allows to easily
+copy and update the Slicer wiki pages after each release.
+
+For more details, see https://www.slicer.org/wiki/Documentation/Nightly/Developers/ReleaseProcess#Update_Slicer_wiki
+
+
 ---------------------------------------
 slicer_wiki_extension_module_listing.py
 ---------------------------------------
@@ -42,6 +53,8 @@ Prerequisites:
 ----------------------------------------
 slicer_extensions_download_statistics.py
 ----------------------------------------
+
+DEPRECATED: The module ``ExtensionStats`` available in ``SlicerDeveloperToolsForExtensions`` should be used.
 
 This script is useful to retrieve the extension download stats
 grouped by release.
