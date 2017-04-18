@@ -95,7 +95,7 @@ def connectToSlicerWiki(username='UpdateBot', password=None):
     :returns: Site object allowing to interact with the wiki.
     :rtype: :class:`mwclient.Site <mwclient:mwclient.client.Site>`
     """
-    return connectToWiki(username, password, 'slicer.org', '/slicerWiki/')
+    return connectToWiki(username, password, 'www.slicer.org', '/w/')
 
 #---------------------------------------------------------------------------
 def connectToWikiByName(name):
@@ -1305,7 +1305,7 @@ def publishContentToWiki(wikiName, page, lines, comment=None):
             "This page has been updated using script {scriptName} (rev {scriptRev}).\n"
             "For more details:\n"
             "  * https://github.com/Slicer/slicer-wiki-scripts\n"
-            "  * http://wiki.slicer.org/slicerWiki/index.php/Documentation/Nightly/Developers/Build_system/SlicerBot\n"
+            "  * https://www.slicer.org/wiki/Documentation/Nightly/Developers/Build_system/SlicerBot\n"
             .format(scriptName=scriptName, scriptRev=scriptRev)
             )
 
@@ -1629,8 +1629,8 @@ def _updateWiki(args):
 
 #---------------------------------------------------------------------------
 setCacheEntry("wiki-slicer-username", "UpdateBot")
-setCacheEntry("wiki-slicer-host", "slicer.org")
-setCacheEntry("wiki-slicer-path", "/slicerWiki/")
+setCacheEntry("wiki-slicer-host", "www.slicer.org")
+setCacheEntry("wiki-slicer-path", "/w/")
 
 #---------------------------------------------------------------------------
 if __name__ == '__main__':
