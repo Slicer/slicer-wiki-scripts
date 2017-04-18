@@ -169,7 +169,8 @@ def prettify(name):
     """Source: http://stackoverflow.com/questions/5020906/python-convert-camel-case-to-space-delimited-using-regex-and-taking-acronyms-in
     """
     name = re.sub(r'^Slicer(Extension)?[\-\_]', "", name)
-    return re.sub("([a-z])([A-Z])","\g<1> \g<2>", name).replace('_', ' ')
+    #return re.sub("([a-z])([A-Z])","\g<1> \g<2>", name).replace('_', ' ')
+    return name
 
 #---------------------------------------------------------------------------
 def getDescriptionFiles(extensionsIndexDir, skip = []):
