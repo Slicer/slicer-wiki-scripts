@@ -1197,7 +1197,9 @@ def saveAllExtensionsModulesMetadata(slicerBuildDir, slicerExtensionsIndexBuildD
     extensionModuleDirectories = [item for sublist in extensionModuleDirectories for item in sublist]
 
     launcherArgs.append('--ignore-slicerrc')
-    launcherArgs.append('--no-main-window')
+    # 2017-04-18 (Jc): Starting without mainwindow is not supported by some extensions
+    #                  and causes Slicer to crash.
+    # launcherArgs.append('--no-main-window')
     launcherArgs.append('--python-script')
     launcherArgs.append(os.path.realpath(__file__))
     launcherArgs.append('save-loaded-modules-metadata')
